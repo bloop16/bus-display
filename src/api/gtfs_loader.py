@@ -15,11 +15,10 @@ from collections import defaultdict
 
 logger = logging.getLogger(__name__)
 
-# Aktuelle GTFS-URL vom österreichischen Open-Data-Katalog.
-# Primärquelle: data.gv.at Katalog-API → holt automatisch die aktuelle Download-URL.
-# Fallback: direkter Datei-Link (muss ggf. manuell aktualisiert werden).
-GTFS_CATALOG_API = "https://www.data.gv.at/api/3/action/package_show?id=fahrplandaten-vmobil-vorarlberg"
-GTFS_URL_FALLBACK = "https://mobilitydata.gv.at/sites/default/files/metadataset/sample_data/20231229-0218_gtfs_vmobil_2024.zip"
+# GTFS-Download-URL für VMobil Vorarlberg (mobilitydata.gv.at).
+# Falls diese URL irgendwann nicht mehr funktioniert, muss sie manuell aktualisiert werden.
+# Neue URL findet man unter: https://mobilitydata.gv.at (nach "vmobil gtfs" suchen)
+GTFS_URL = "https://mobilitydata.gv.at/sites/default/files/metadataset/sample_data/20231229-0218_gtfs_vmobil_2024.zip"
 CACHE_DIR = Path(__file__).parent.parent.parent / "data"
 STOPS_CACHE_FILE = CACHE_DIR / "stops.json"
 SCHEDULE_CACHE_FILE = CACHE_DIR / "schedule.json"
@@ -92,30 +91,11 @@ class GTFSLoader:
             logger.error(f"Failed to load schedule cache: {e}. Fetching fresh data.")
             self._fetch_and_parse()
 
-    def _resolve_gtfs_url(self) -> str:
-        """Resolve current GTFS download URL via data.gv.at catalog API."""
-        try:
-            logger.info("Fetching current GTFS URL from data.gv.at catalog...")
-            resp = requests.get(GTFS_CATALOG_API, timeout=10)
-            resp.raise_for_status()
-            data = resp.json()
-            resources = data.get('result', {}).get('resources', [])
-            for res in resources:
-                url = res.get('url', '')
-                if url.endswith('.zip') and 'gtfs' in url.lower():
-                    logger.info(f"Catalog GTFS URL: {url}")
-                    return url
-        except Exception as e:
-            logger.warning(f"Catalog API failed: {e}")
-        logger.warning(f"Using fallback GTFS URL: {GTFS_URL_FALLBACK}")
-        return GTFS_URL_FALLBACK
-
     def _fetch_and_parse(self):
         """Fetch GTFS ZIP and parse stops.txt"""
         try:
-            gtfs_url = self._resolve_gtfs_url()
-            logger.info(f"Downloading GTFS from {gtfs_url}")
-            response = requests.get(gtfs_url, timeout=60)
+            logger.info(f"Downloading GTFS from {GTFS_URL}")
+            response = requests.get(GTFS_URL, timeout=60)
             response.raise_for_status()
 
             # Save ZIP to temp location

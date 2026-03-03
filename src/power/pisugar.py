@@ -1,215 +1,151 @@
 """
-PiSugar Battery HAT Integration
-Monitors battery level and handles button press events.
+PiSugar 3 Battery HAT Integration.
+Communicates via pisugar-server Unix socket (I2C daemon).
+Install pisugar-server: curl https://cdn.pisugar.com/release/pisugar-power-manager.sh | sudo bash
 """
-import subprocess
-import logging
+import socket
+import threading
 import time
+import logging
 from typing import Optional, Callable
 
 logger = logging.getLogger(__name__)
 
+PISUGAR_SOCKET = '/tmp/pisugar-server.sock'
+
+
+def _pisugar_cmd(cmd: str) -> str:
+    """Send command to pisugar-server socket, return response string."""
+    try:
+        s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        s.settimeout(2)
+        s.connect(PISUGAR_SOCKET)
+        s.send((cmd + '\n').encode())
+        data = b''
+        while b'\n' not in data:
+            chunk = s.recv(256)
+            if not chunk:
+                break
+            data += chunk
+        s.close()
+        return data.decode().strip()
+    except Exception as e:
+        logger.debug(f"pisugar-server '{cmd}' failed: {e}")
+        return ''
+
 
 class PiSugar:
-    """Interface to PiSugar battery HAT"""
-    
+    """Interface to PiSugar 3 battery HAT via pisugar-server daemon."""
+
     def __init__(self, mock=False):
-        """
-        Initialize PiSugar interface.
-        
-        Args:
-            mock: If True, return simulated values (for testing)
-        """
         self.mock = mock
         self.available = False
-        
+        self._button_callback: Optional[Callable] = None
+        self._stop_event = threading.Event()
+        self._button_thread: Optional[threading.Thread] = None
+
         if not mock:
             self.available = self._check_availability()
-    
+
     def _check_availability(self) -> bool:
-        """Check if PiSugar is available"""
-        try:
-            # Try to read battery level
-            result = subprocess.run(
-                ['cat', '/sys/class/power_supply/pisugar-battery/capacity'],
-                capture_output=True,
-                text=True,
-                timeout=1
-            )
-            return result.returncode == 0
-        except:
-            logger.warning("PiSugar not detected")
-            return False
-    
+        """Check if pisugar-server is running and responsive."""
+        resp = _pisugar_cmd('get battery')
+        available = resp.startswith('battery:')
+        if not available:
+            logger.warning("PiSugar not detected — is pisugar-server running?")
+        else:
+            logger.info("PiSugar 3 detected via pisugar-server")
+        return available
+
     def get_battery_level(self) -> Optional[int]:
         """
         Get battery level (0-100%).
-        
+
         Returns:
             Battery percentage or None if unavailable
         """
         if self.mock:
-            return 75  # Mock value
-        
+            return 75
+
         if not self.available:
             return None
-        
+
+        resp = _pisugar_cmd('get battery')
         try:
-            result = subprocess.run(
-                ['cat', '/sys/class/power_supply/pisugar-battery/capacity'],
-                capture_output=True,
-                text=True,
-                timeout=1
-            )
-            
-            if result.returncode == 0:
-                return int(result.stdout.strip())
-            
-        except Exception as e:
-            logger.error(f"Failed to read battery level: {e}")
-        
-        return None
-    
+            # "battery: 75.3"
+            return int(float(resp.split(':', 1)[1].strip()))
+        except Exception:
+            return None
+
     def is_charging(self) -> bool:
         """
-        Check if battery is charging (AC power connected).
-        
+        Check if battery is charging (USB power connected).
+
         Returns:
-            True if AC power connected
+            True if charging or if PiSugar unavailable (assume AC)
         """
         if self.mock:
-            return False  # Mock: on battery
-        
+            return False
+
         if not self.available:
             return True  # Assume AC if no battery detected
-        
+
+        resp = _pisugar_cmd('get battery_charging')
         try:
-            result = subprocess.run(
-                ['cat', '/sys/class/power_supply/pisugar-battery/status'],
-                capture_output=True,
-                text=True,
-                timeout=1
-            )
-            
-            if result.returncode == 0:
-                status = result.stdout.strip().lower()
-                return status in ['charging', 'full']
-            
-        except Exception as e:
-            logger.error(f"Failed to read charging status: {e}")
-        
-        return True  # Default: assume AC power
-    
-    def get_voltage(self) -> Optional[float]:
-        """
-        Get battery voltage in volts.
-        
-        Returns:
-            Voltage or None if unavailable
-        """
-        if self.mock:
-            return 3.7  # Mock value
-        
-        if not self.available:
-            return None
-        
-        try:
-            result = subprocess.run(
-                ['cat', '/sys/class/power_supply/pisugar-battery/voltage_now'],
-                capture_output=True,
-                text=True,
-                timeout=1
-            )
-            
-            if result.returncode == 0:
-                # Value is in microvolts
-                microvolts = int(result.stdout.strip())
-                return microvolts / 1_000_000.0
-            
-        except Exception as e:
-            logger.error(f"Failed to read voltage: {e}")
-        
-        return None
-    
+            # "battery_charging: true" or "battery_charging: false"
+            return 'true' in resp.lower()
+        except Exception:
+            return True
+
     def register_button_callback(self, callback: Callable):
         """
         Register callback for button press events.
-        
+        Polls pisugar-server every 500ms in a background thread.
+
         Args:
-            callback: Function to call when button is pressed
+            callback: Function to call on button press
         """
-        # PiSugar button handling via GPIO
-        # GPIO pin for button: check PiSugar docs
-        # This is a simplified implementation
-        
+        self._button_callback = callback
+
         if self.mock:
             logger.info("[MOCK] Button callback registered")
             return
-        
-        try:
-            import RPi.GPIO as GPIO
-            
-            BUTTON_PIN = 4  # Check PiSugar documentation
-            
-            GPIO.setmode(GPIO.BCM)
-            GPIO.setup(BUTTON_PIN, GPIO.IN, pull_up_down=GPIO.PUD_UP)
-            
-            def button_pressed(channel):
-                logger.info("Button pressed!")
-                callback()
-            
-            GPIO.add_event_detect(
-                BUTTON_PIN,
-                GPIO.FALLING,
-                callback=button_pressed,
-                bouncetime=300
-            )
-            
-            logger.info("Button callback registered")
-            
-        except Exception as e:
-            logger.error(f"Failed to register button callback: {e}")
-    
+
+        if not self.available:
+            logger.warning("PiSugar not available, button callback skipped")
+            return
+
+        self._stop_event.clear()
+        self._button_thread = threading.Thread(
+            target=self._poll_button, daemon=True, name="pisugar-btn"
+        )
+        self._button_thread.start()
+        logger.info("PiSugar button polling started")
+
+    def _poll_button(self):
+        """Poll pisugar-server for button_press events in background."""
+        while not self._stop_event.is_set():
+            try:
+                resp = _pisugar_cmd('get button_press')
+                # "button_press: single" / "button_press: double" / "button_press: "
+                if resp.startswith('button_press:'):
+                    value = resp.split(':', 1)[1].strip()
+                    if value and value not in ('none', ''):
+                        logger.info(f"Button press detected: {value}")
+                        if self._button_callback:
+                            self._button_callback()
+            except Exception as e:
+                logger.debug(f"Button poll error: {e}")
+            time.sleep(0.5)
+
+    def stop(self):
+        """Stop button polling thread."""
+        self._stop_event.set()
+
     def get_status_dict(self) -> dict:
-        """
-        Get complete power status as dictionary.
-        
-        Returns:
-            Dictionary with battery_level, charging, voltage
-        """
+        """Get complete power status as dictionary."""
         return {
             'battery_level': self.get_battery_level(),
             'charging': self.is_charging(),
-            'voltage': self.get_voltage(),
-            'available': self.available or self.mock
+            'available': self.available or self.mock,
         }
-
-
-def main():
-    """Test PiSugar interface"""
-    logging.basicConfig(level=logging.INFO)
-    
-    # Test with mock mode
-    pisugar = PiSugar(mock=True)
-    
-    print("=== PiSugar Status ===")
-    status = pisugar.get_status_dict()
-    
-    print(f"Available: {status['available']}")
-    print(f"Battery Level: {status['battery_level']}%")
-    print(f"Charging: {status['charging']}")
-    print(f"Voltage: {status['voltage']}V")
-    
-    # Test button callback
-    def on_button_press():
-        print("Button pressed! Updating display...")
-    
-    pisugar.register_button_callback(on_button_press)
-    
-    if pisugar.mock:
-        print("\n[MOCK MODE] Simulating button press...")
-        on_button_press()
-
-
-if __name__ == '__main__':
-    main()

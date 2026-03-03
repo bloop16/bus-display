@@ -26,14 +26,15 @@ class DisplayDriver:
                 # Import Waveshare library
                 from waveshare_epd import epd2in13_V4
                 self.epd = epd2in13_V4.EPD()
-                
+
                 logger.info("Initializing e-Paper display...")
                 self.epd.init()
                 self.epd.Clear(0xFF)  # Clear to white
-                
+                self.epd.sleep()      # Power-save immediately after clear
+
                 self.initialized = True
                 logger.info("Display initialized successfully")
-                
+
             except ImportError:
                 logger.warning("Waveshare library not found, using mock mode")
                 self.mock = True
@@ -60,12 +61,14 @@ class DisplayDriver:
         if self.mock:
             logger.info(f"[MOCK] Would display image: {image.size} {image.mode}")
             return
-        
+
         try:
-            # Convert to correct format for Waveshare
+            # Wake display from sleep, show image, then sleep again
+            self.epd.init()
             buf = self.epd.getbuffer(image)
             self.epd.display(buf)
-            logger.info("Image displayed successfully")
+            self.epd.sleep()
+            logger.info("Image displayed, display sleeping")
         except Exception as e:
             logger.error(f"Display failed: {e}")
     

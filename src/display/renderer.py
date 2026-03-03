@@ -54,7 +54,7 @@ class DisplayRenderer:
         departures: List,
         stop_name: str,
         battery_percent: Optional[int] = None,
-        wifi_connected: bool = True
+        wifi_signal: Optional[int] = None
     ) -> Image.Image:
         """
         Render bus departures to image.
@@ -63,7 +63,7 @@ class DisplayRenderer:
             departures: List of Departure objects (up to 6 shown)
             stop_name: Name of bus stop (shown in header)
             battery_percent: Battery level 0-100, None if AC powered
-            wifi_connected: WiFi status indicator
+            wifi_signal: WiFi signal quality 0-100, None if not connected
 
         Returns:
             PIL Image (1-bit B/W, 250x122px)
@@ -73,10 +73,10 @@ class DisplayRenderer:
 
         # ── Header ───────────────────────────────────────────────
         y = 1
-        header_text = self._truncate(stop_name, max_px=165)
+        header_text = self._truncate(stop_name, max_px=155)
         draw.text((2, y), header_text, font=self.font_header, fill=0)
 
-        # Status icons (right side)
+        # Status indicators (right side, stacked left from edge)
         x_right = self.width - 2
         if battery_percent is not None:
             bat_text = f"{battery_percent}%"
@@ -84,9 +84,11 @@ class DisplayRenderer:
             draw.text((x_right - bat_w, y + 1), bat_text, font=self.font_small, fill=0)
             x_right -= bat_w + 4
 
-        if wifi_connected:
-            w_w = int(draw.textlength("W", font=self.font_small))
-            draw.text((x_right - w_w, y + 1), "W", font=self.font_small, fill=0)
+        if wifi_signal is not None:
+            # Show signal as "W:75" (compact)
+            wifi_text = f"W:{wifi_signal}"
+            wifi_w = int(draw.textlength(wifi_text, font=self.font_small))
+            draw.text((x_right - wifi_w, y + 1), wifi_text, font=self.font_small, fill=0)
 
         # ── Divider ───────────────────────────────────────────────
         y += 14
