@@ -121,3 +121,51 @@ MIT
 - Waveshare e-Paper library
 - VMobil.at for transport data
 - Built with TDD principles
+
+---
+
+## 🖥️ Local Testing (No SD Card Flashing!)
+
+### Docker ARM Emulation ⭐ FASTEST!
+
+Test on your desktop/laptop without Pi hardware:
+
+```bash
+# One-time setup: Enable ARM emulation
+docker run --rm --privileged multiarch/qemu-user-static --reset -p yes
+
+# Build and run
+docker build -t bus-display .
+docker run -p 5000:5000 bus-display
+
+# Or use the script
+./test-local.sh
+```
+
+Visit: **http://localhost:5000**
+
+### Docker Compose
+
+```bash
+docker-compose up
+```
+
+### Manual Testing
+
+```bash
+# On dev server (current workflow)
+python3 main.py --mock-display
+
+# Continuous mode
+python3 main.py --mock-display --continuous --interval 5
+```
+
+### Development Workflow
+
+1. **Code** → Edit files locally
+2. **Test** → `./test-local.sh` (Docker)
+3. **Deploy** → Copy to Pi / Flash SD
+4. **Validate** → Test on real hardware
+
+**No constant SD card flashing needed!**
+

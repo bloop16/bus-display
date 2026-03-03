@@ -1,0 +1,36 @@
+# Git
+.git
+.gitignore
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+.coverage
+
+# Local testing
+logs/
+*.log
+
+# Documentation
+docs/
+README.md
+INSTALL.md
+
+# Systemd
+systemd/
+
+# Dev files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
