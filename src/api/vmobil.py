@@ -119,7 +119,7 @@ class VMobilAPI:
             query_lower = query.lower()
             # Fuzzy matching
             matches = [s for s in fallback_stops if query_lower in s['name'].lower()]
-            return matches[:10] if matches else fallback_stops[:5]
+            return matches[:10]
             
         except Exception as e:
             logger.error(f"Fallback search failed: {e}")
@@ -163,7 +163,26 @@ class VMobilAPI:
             except Exception as e:
                 logger.warning(f"Web scraper failed, falling back to mock: {e}")
         
-        # Fallback: Mock-Daten
+        # Fallback 1: GTFS Soll-Abfahrten
+        if self.use_gtfs and self.gtfs and stop_id:
+            try:
+                scheduled = self.gtfs.get_scheduled_departures(stop_id=stop_id, limit=limit)
+                if scheduled:
+                    logger.info(f"Using GTFS schedule fallback for stop {stop_id}")
+                    return [
+                        Departure(
+                            line=dep['line'],
+                            destination=dep['destination'],
+                            departure_time=dep['departure_time'],
+                            stop_name=dep['stop_name'],
+                            delay_minutes=dep.get('delay_minutes')
+                        )
+                        for dep in scheduled
+                    ]
+            except Exception as e:
+                logger.warning(f"GTFS fallback failed: {e}")
+
+        # Fallback 2: Statische Mock-Daten
         try:
             # Use stop name if provided, otherwise resolve ID
             name = stop_name if stop_name else self._resolve_stop_id(stop_id)
