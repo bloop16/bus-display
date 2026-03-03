@@ -1,8 +1,10 @@
 # Waveshare 2.13" e-Paper HAT V4 – Raspberry Pi Zero
-# Install Waveshare library separately (see install.sh):
-#   git clone https://github.com/waveshare/e-Paper
-#   pip3 install e-Paper/RaspberryPi_JetsonNano/python/
+# Waveshare library: install separately via install.sh (not on PyPI)
 
+# Display
 Pillow>=10.0.0
 RPi.GPIO>=0.7.1
 spidev>=3.6
+
+# Web-UI (Konfiguration, läuft parallel)
+Flask>=3.0.0

@@ -24,6 +24,7 @@ apt-get install -y \
     python3-pil \
     python3-rpi.gpio \
     python3-spidev \
+    python3-flask \
     git curl
 
 # ── SPI aktivieren (Waveshare Display) ───────────────────────
@@ -34,15 +35,22 @@ raspi-config nonint do_spi 0
 echo "I2C aktivieren..."
 raspi-config nonint do_i2c 0
 
-# ── Waveshare e-Paper Bibliothek ──────────────────────────────
-echo "Waveshare Bibliothek installieren..."
-cd /tmp
-rm -rf e-Paper
-git clone --depth=1 https://github.com/waveshare/e-Paper.git
-pip3 install ./e-Paper/RaspberryPi_JetsonNano/python/ \
+# ── Waveshare e-Paper Bibliothek (nur Python-Lib, kein voller Clone) ──
+echo "Waveshare Bibliothek installieren (sparse checkout)..."
+rm -rf /tmp/waveshare-epd
+git clone \
+    --depth=1 \
+    --filter=blob:none \
+    --sparse \
+    https://github.com/waveshare/e-Paper.git \
+    /tmp/waveshare-epd
+cd /tmp/waveshare-epd
+git sparse-checkout set RaspberryPi_JetsonNano/python
+pip3 install ./RaspberryPi_JetsonNano/python/ \
     --break-system-packages 2>/dev/null || \
-    pip3 install ./e-Paper/RaspberryPi_JetsonNano/python/
-rm -rf /tmp/e-Paper
+    pip3 install ./RaspberryPi_JetsonNano/python/
+cd /
+rm -rf /tmp/waveshare-epd
 
 # ── pip Dependencies ──────────────────────────────────────────
 cd "$INSTALL_DIR"
@@ -54,16 +62,20 @@ pip3 install -r requirements.txt \
 echo "PiSugar 3 installieren..."
 curl -s https://cdn.pisugar.com/release/pisugar-power-manager.sh | bash
 
-# ── Systemd Service ───────────────────────────────────────────
-echo "Service einrichten..."
-cp "$INSTALL_DIR/systemd/bus-display.service" /etc/systemd/system/
-sed -i "s|/home/pi/bus-display|$INSTALL_DIR|g" /etc/systemd/system/bus-display.service
-sed -i "s|User=pi|User=$ACTUAL_USER|g"          /etc/systemd/system/bus-display.service
+# ── Systemd Services ──────────────────────────────────────────
+echo "Services einrichten..."
+
+for SERVICE in bus-display bus-display-web; do
+    cp "$INSTALL_DIR/systemd/${SERVICE}.service" /etc/systemd/system/
+    sed -i "s|/home/pi/bus-display|$INSTALL_DIR|g" /etc/systemd/system/${SERVICE}.service
+    sed -i "s|User=pi|User=$ACTUAL_USER|g"          /etc/systemd/system/${SERVICE}.service
+done
 
 systemctl daemon-reload
-systemctl enable bus-display
-systemctl start bus-display
+systemctl enable bus-display bus-display-web
+systemctl start bus-display bus-display-web
 
 echo ""
 echo "=== Fertig! ==="
-echo "Log: journalctl -u bus-display -f"
+echo "Display-Log: journalctl -u bus-display -f"
+echo "Web-UI:      http://$(hostname -I | awk '{print $1}'):5000"
