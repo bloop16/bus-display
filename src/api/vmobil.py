@@ -23,7 +23,8 @@ class Departure:
     departure_time: datetime
     stop_name: str
     delay_minutes: Optional[int] = None
-    
+    icon: Optional[str] = None  # 'home', 'work', 'star' oder None
+
     def to_dict(self) -> Dict:
         """Convert to dictionary for JSON serialization"""
         data = asdict(self)
@@ -177,3 +178,47 @@ class VMobilAPI:
 
         logger.warning(f"No live or GTFS departures available for stop {stop_id or stop_name}")
         return []
+
+    def get_all_departures(
+        self,
+        stops: List[Dict],
+        destinations: List[Dict],
+        limit: int = 6
+    ) -> List[Departure]:
+        """
+        Aggregate departures from all configured stops, sorted by time.
+
+        Args:
+            stops: List of stop dicts with 'id' and 'name'
+            destinations: List of destination dicts with 'icon' and 'keywords'
+            limit: Maximum total departures to return
+
+        Returns:
+            Merged, time-sorted list of Departure objects (with icon set if matching)
+        """
+        all_deps: List[Departure] = []
+
+        for stop in stops:
+            try:
+                deps = self.get_departures(stop_id=stop['id'], limit=limit)
+                all_deps.extend(deps)
+            except Exception as e:
+                logger.warning(f"Failed to get departures for {stop.get('name')}: {e}")
+
+        # Sort by departure time
+        all_deps.sort(key=lambda d: d.departure_time)
+
+        # Assign icons via keyword matching
+        for dep in all_deps:
+            dep.icon = self._match_destination_icon(dep.destination, destinations)
+
+        return all_deps[:limit]
+
+    def _match_destination_icon(self, destination: str, destinations: List[Dict]) -> Optional[str]:
+        """Return icon name if destination matches any configured keyword, else None."""
+        dest_lower = destination.lower()
+        for entry in destinations:
+            for keyword in entry.get('keywords', []):
+                if keyword.lower() in dest_lower:
+                    return entry.get('icon')
+        return None

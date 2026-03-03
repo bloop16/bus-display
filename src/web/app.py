@@ -14,108 +14,128 @@ def create_app(testing=False):
     """Application factory"""
     app = Flask(__name__)
     app.config['TESTING'] = testing
-    
-    # Paths
+
     BASE_DIR = Path(__file__).parent.parent.parent
     CONFIG_DIR = BASE_DIR / 'config'
     CONFIG_FILE = CONFIG_DIR / 'stops.json'
-    
-    # Ensure config dir exists
+
     CONFIG_DIR.mkdir(exist_ok=True)
-    
-    # Import API client
+
     from src.api import VMobilAPI
     api = VMobilAPI()
-    
+
+    def _load_config() -> dict:
+        if CONFIG_FILE.exists():
+            with open(CONFIG_FILE) as f:
+                return json.load(f)
+        return {'stops': [], 'destinations': []}
+
+    def _save_config(config: dict):
+        with open(CONFIG_FILE, 'w') as f:
+            json.dump(config, f, indent=2)
+
     @app.route('/')
     def index():
-        """Homepage"""
         return render_template('index.html')
-    
+
+    # ── Stops ────────────────────────────────────────────────────
+
     @app.route('/api/stops')
     def api_search_stops():
         """Search bus stops"""
         query = request.args.get('q', '')
-        
         if not query:
             return jsonify([])
-        
         try:
-            stops = api.search_stops(query)
-            return jsonify(stops)
+            return jsonify(api.search_stops(query))
         except Exception as e:
             logger.error(f'Stop search failed: {e}')
             return jsonify({'error': str(e)}), 500
-    
+
+    # ── Departures ───────────────────────────────────────────────
+
     @app.route('/api/departures')
     def api_get_departures():
-        """Get departures for a stop"""
+        """
+        Get departures.
+        - Without stop_id: aggregates all configured stops (max 6), with icon matching
+        - With stop_id: single stop query (backwards compatible)
+        """
         stop_id = request.args.get('stop_id')
-        
-        if not stop_id:
-            return jsonify({'error': 'stop_id required'}), 400
-        
+        limit = int(request.args.get('limit', 6))
+
         try:
-            limit = int(request.args.get('limit', 10))
-            departures = api.get_departures(stop_id=stop_id, limit=limit)
-            
-            # Convert to dict for JSON
+            if stop_id:
+                departures = api.get_departures(stop_id=stop_id, limit=limit)
+            else:
+                config = _load_config()
+                stops = config.get('stops', [])
+                destinations = config.get('destinations', [])
+                departures = api.get_all_departures(stops, destinations, limit=limit)
+
             return jsonify([dep.to_dict() for dep in departures])
         except Exception as e:
             logger.error(f'Departure fetch failed: {e}')
             return jsonify({'error': str(e)}), 500
-    
+
+    # ── Config ───────────────────────────────────────────────────
+
     @app.route('/api/config', methods=['GET', 'POST'])
     def api_config():
-        """Get or save configuration"""
+        """Get or save full configuration (stops + destinations)"""
         if request.method == 'GET':
-            # Load config
-            if CONFIG_FILE.exists():
-                with open(CONFIG_FILE) as f:
-                    config = json.load(f)
-            else:
-                config = {'stops': []}
-            
-            return jsonify(config)
-        
-        else:  # POST
-            # Save config
-            try:
-                config = request.get_json()
-                
-                if not config or 'stops' not in config:
-                    return jsonify({'error': 'Invalid config'}), 400
-                
-                with open(CONFIG_FILE, 'w') as f:
-                    json.dump(config, f, indent=2)
-                
-                logger.info(f'Config saved: {len(config["stops"])} stops')
-                return jsonify({'status': 'ok'})
-            
-            except Exception as e:
-                logger.error(f'Config save failed: {e}')
-                return jsonify({'error': str(e)}), 500
-    
-    # WiFi Setup Routes
+            return jsonify(_load_config())
+
+        config = request.get_json()
+        if not config or 'stops' not in config:
+            return jsonify({'error': 'Invalid config'}), 400
+        try:
+            _save_config(config)
+            logger.info(f'Config saved: {len(config["stops"])} stops, '
+                        f'{len(config.get("destinations", []))} destinations')
+            return jsonify({'status': 'ok'})
+        except Exception as e:
+            logger.error(f'Config save failed: {e}')
+            return jsonify({'error': str(e)}), 500
+
+    # ── Destinations ─────────────────────────────────────────────
+
+    @app.route('/api/destinations', methods=['GET', 'POST'])
+    def api_destinations():
+        """Get or save destinations configuration"""
+        if request.method == 'GET':
+            return jsonify(_load_config().get('destinations', []))
+
+        destinations = request.get_json()
+        if not isinstance(destinations, list):
+            return jsonify({'error': 'Expected a list of destinations'}), 400
+        try:
+            config = _load_config()
+            config['destinations'] = destinations
+            _save_config(config)
+            logger.info(f'Destinations saved: {len(destinations)} entries')
+            return jsonify({'status': 'ok'})
+        except Exception as e:
+            logger.error(f'Destinations save failed: {e}')
+            return jsonify({'error': str(e)}), 500
+
+    # ── WiFi ─────────────────────────────────────────────────────
+
     @app.route('/wifi')
     def wifi_setup():
-        """WiFi setup page"""
         return render_template('wifi_setup.html')
 
     @app.route('/api/wifi/status')
     def wifi_status():
-        """Get WiFi connection status"""
         try:
             from src.wifi.ap_manager import APManager
             ap = APManager()
-            
             ssid = None
             if ap.is_wifi_connected():
                 import subprocess
                 result = subprocess.run(['iwgetid', '-r'], capture_output=True, text=True)
                 if result.returncode == 0:
                     ssid = result.stdout.strip()
-            
             return jsonify({
                 'connected': ap.is_wifi_connected(),
                 'ssid': ssid,
@@ -126,32 +146,23 @@ def create_app(testing=False):
 
     @app.route('/api/wifi/connect', methods=['POST'])
     def wifi_connect():
-        """Connect to WiFi network"""
         try:
             data = request.json
             ssid = data.get('ssid')
             password = data.get('password')
-            
             if not ssid or not password:
                 return jsonify({'error': 'SSID and password required'}), 400
-            
             from src.wifi.ap_manager import APManager
             ap = APManager()
-            
-            success = ap.connect_to_wifi(ssid, password)
-            
-            if success:
+            if ap.connect_to_wifi(ssid, password):
                 return jsonify({'success': True})
-            else:
-                return jsonify({'error': 'Connection failed'}), 500
-                
+            return jsonify({'error': 'Connection failed'}), 500
         except Exception as e:
             return jsonify({'error': str(e)}), 500
-    
+
     return app
 
 
 if __name__ == '__main__':
     app = create_app()
     app.run(host='0.0.0.0', port=5000, debug=True)
-

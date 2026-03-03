@@ -34,52 +34,29 @@
             transition: all 0.3s;
             font-weight: 500;
         }
-        .tab.active {
-            border-bottom-color: #667eea;
-            color: #667eea;
+        .tab.active { border-bottom-color: #667eea; color: #667eea; }
+        .tab:hover { background: #f8f8f8; }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+        h1 { color: #333; margin-bottom: 10px; font-size: 28px; }
+        h3 { color: #444; margin: 20px 0 12px; font-size: 16px; }
+        .subtitle { color: #666; margin-bottom: 30px; font-size: 14px; }
+        .section-divider {
+            border: none; border-top: 2px solid #e8e8e8;
+            margin: 28px 0 20px;
         }
-        .tab:hover {
-            background: #f8f8f8;
-        }
-        .tab-content {
-            display: none;
-        }
-        .tab-content.active {
-            display: block;
-        }
-        h1 {
-            color: #333;
-            margin-bottom: 10px;
-            font-size: 28px;
-        }
-        .subtitle {
-            color: #666;
-            margin-bottom: 30px;
-            font-size: 14px;
-        }
-        .search-box {
-            position: relative;
-            margin-bottom: 20px;
-        }
+        .search-box { position: relative; margin-bottom: 20px; }
         input[type="text"], input[type="password"] {
             width: 100%;
             padding: 14px;
             border: 2px solid #e0e0e0;
             border-radius: 8px;
-            font-size: 16px;
+            font-size: 15px;
             transition: border 0.3s;
             margin-bottom: 10px;
         }
-        input:focus {
-            outline: none;
-            border-color: #667eea;
-        }
-        label {
-            display: block;
-            margin: 15px 0 5px;
-            color: #333;
-            font-weight: 500;
-        }
+        input:focus { outline: none; border-color: #667eea; }
+        label { display: block; margin: 15px 0 5px; color: #333; font-weight: 500; }
         .results {
             max-height: 300px;
             overflow-y: auto;
@@ -94,12 +71,8 @@
             border-bottom: 1px solid #f0f0f0;
             transition: background 0.2s;
         }
-        .result-item:hover {
-            background: #f8f8f8;
-        }
-        .selected-stops {
-            margin: 20px 0;
-        }
+        .result-item:hover { background: #f8f8f8; }
+        .selected-stops { margin: 10px 0 20px; }
         .stop-chip {
             display: inline-block;
             background: #667eea;
@@ -110,64 +83,78 @@
             font-size: 14px;
         }
         .stop-chip button {
-            background: none;
-            border: none;
-            color: white;
-            margin-left: 8px;
-            cursor: pointer;
-            font-weight: bold;
+            background: none; border: none; color: white;
+            margin-left: 8px; cursor: pointer; font-weight: bold;
         }
-        .btn {
-            background: #667eea;
-            color: white;
-            padding: 12px 24px;
-            border: none;
+        /* Destinations */
+        .destination-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 10px;
+            background: #f8f9fa;
+            padding: 10px 12px;
             border-radius: 8px;
-            font-size: 16px;
+        }
+        .destination-row select {
+            padding: 8px 10px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 15px;
+            background: white;
+            cursor: pointer;
+            min-width: 120px;
+        }
+        .destination-row select:focus { outline: none; border-color: #667eea; }
+        .destination-row input[type="text"] {
+            flex: 1;
+            padding: 8px 12px;
+            margin-bottom: 0;
+            font-size: 14px;
+        }
+        .destination-row .remove-btn {
+            background: none; border: none;
+            color: #999; font-size: 20px;
+            cursor: pointer; padding: 4px 6px;
+            line-height: 1;
+        }
+        .destination-row .remove-btn:hover { color: #dc3545; }
+        .add-btn {
+            background: none;
+            border: 2px dashed #667eea;
+            color: #667eea;
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-size: 14px;
             cursor: pointer;
             width: 100%;
-            margin-top: 20px;
-            transition: background 0.3s;
+            margin-top: 4px;
+            transition: all 0.2s;
         }
-        .btn:hover {
-            background: #5568d3;
+        .add-btn:hover { background: #f0f2ff; }
+        /* Buttons */
+        .btn {
+            background: #667eea; color: white;
+            padding: 12px 24px; border: none; border-radius: 8px;
+            font-size: 16px; cursor: pointer; width: 100%;
+            margin-top: 20px; transition: background 0.3s;
         }
-        .btn.secondary {
-            background: #6c757d;
-        }
-        .btn.secondary:hover {
-            background: #5a6268;
-        }
+        .btn:hover { background: #5568d3; }
+        .btn.secondary { background: #6c757d; }
+        .btn.secondary:hover { background: #5a6268; }
+        /* Status */
         .status {
-            padding: 12px;
-            border-radius: 8px;
-            margin-top: 15px;
-            display: none;
+            padding: 12px; border-radius: 8px; margin-top: 15px; display: none;
         }
-        .status.success {
-            background: #d4edda;
-            color: #155724;
-        }
-        .status.error {
-            background: #f8d7da;
-            color: #721c24;
-        }
-        .status.info {
-            background: #d1ecf1;
-            color: #0c5460;
-        }
-        .wifi-status {
-            padding: 15px;
-            background: #f8f9fa;
-            border-radius: 8px;
-            margin-bottom: 20px;
-        }
-        .wifi-status.connected {
-            background: #d4edda;
-        }
-        .departures-live {
-            margin-top: 20px;
-        }
+        .status.success { background: #d4edda; color: #155724; }
+        .status.error   { background: #f8d7da; color: #721c24; }
+        .status.info    { background: #d1ecf1; color: #0c5460; }
+        /* WiFi */
+        .wifi-status { padding: 15px; background: #f8f9fa; border-radius: 8px; margin-bottom: 20px; }
+        .wifi-status.connected { background: #d4edda; }
+        .card { background: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 15px; }
+        /* Live departures */
+        .departures-live { margin-top: 20px; }
         .departure-item {
             display: flex;
             justify-content: space-between;
@@ -175,342 +162,363 @@
             border-bottom: 1px solid #e0e0e0;
             align-items: center;
         }
-        .departure-item:last-child {
-            border-bottom: none;
-        }
+        .departure-item:last-child { border-bottom: none; }
         .departure-line {
-            background: #667eea;
-            color: white;
-            padding: 4px 12px;
-            border-radius: 12px;
-            font-weight: bold;
-            min-width: 40px;
-            text-align: center;
+            background: #667eea; color: white;
+            padding: 4px 12px; border-radius: 12px;
+            font-weight: bold; min-width: 44px; text-align: center;
         }
         .departure-destination {
-            flex: 1;
-            margin: 0 15px;
-            font-weight: 500;
+            flex: 1; margin: 0 12px; font-weight: 500;
         }
-        .departure-time {
-            color: #667eea;
-            font-weight: bold;
-            font-size: 18px;
+        .departure-icon { font-size: 18px; margin-right: 6px; }
+        .departure-time { color: #667eea; font-weight: bold; font-size: 18px; }
+        .departure-delay { color: #dc3545; font-size: 12px; margin-left: 6px; }
+        .live-header {
+            color: #666; font-size: 13px; margin-bottom: 12px;
         }
-        .departure-delay {
-            color: #dc3545;
-            font-size: 12px;
-            margin-left: 8px;
-        }
-        .loading {
-            text-align: center;
-            padding: 20px;
-            color: #666;
-        }
-        .card {
-            background: #f8f9fa;
-            padding: 15px;
-            border-radius: 8px;
-            margin-bottom: 15px;
-        }
+        .loading { text-align: center; padding: 20px; color: #666; }
     </style>
 </head>
 <body>
-    <div class="container">
-        <h1>🚍 Bus Display</h1>
-        <p class="subtitle">Konfiguration & Live-Abfahrten</p>
-        
-        <div class="tabs">
-            <div class="tab active" onclick="switchTab('stops')">🚏 Haltestellen</div>
-            <div class="tab" onclick="switchTab('live')">⏱️ Live-Abfahrten</div>
-            <div class="tab" onclick="switchTab('wifi')">📡 WiFi</div>
-        </div>
-        
-        <!-- Haltestellen Tab -->
-        <div id="tab-stops" class="tab-content active">
-            <div class="search-box">
-                <label for="searchInput">Haltestelle suchen</label>
-                <input type="text" id="searchInput" placeholder="z.B. Bregenz Bahnhof, Dornbirn...">
-                <div id="results" class="results"></div>
-            </div>
-            
-            <label>Ausgewählte Haltestellen</label>
-            <div id="selectedStops" class="selected-stops"></div>
-            
-            <button class="btn" onclick="saveConfig()">💾 Konfiguration speichern</button>
-            <div id="status" class="status"></div>
-        </div>
-        
-        <!-- Live-Abfahrten Tab -->
-        <div id="tab-live" class="tab-content">
-            <label>Wähle eine Haltestelle</label>
-            <select id="liveStopSelect" class="btn secondary" onchange="loadLiveDepartures()">
-                <option value="">-- Bitte wählen --</option>
-            </select>
-            
-            <div id="liveDepartures" class="departures-live">
-                <p class="loading">Wähle eine Haltestelle um Live-Abfahrten zu sehen</p>
-            </div>
-            
-            <button class="btn secondary" onclick="loadLiveDepartures()" style="margin-top: 20px">🔄 Aktualisieren</button>
-        </div>
-        
-        <!-- WiFi Tab -->
-        <div id="tab-wifi" class="tab-content">
-            <div id="wifiStatus" class="wifi-status">
-                <strong>Status:</strong> <span id="wifiStatusText">Wird geladen...</span>
-            </div>
-            
-            <div class="card">
-                <h3 style="margin-bottom: 15px">Mit WiFi verbinden</h3>
-                <label for="wifiSSID">SSID (Netzwerkname)</label>
-                <input type="text" id="wifiSSID" placeholder="MeinWLAN">
-                
-                <label for="wifiPassword">Passwort</label>
-                <input type="password" id="wifiPassword" placeholder="••••••••">
-                
-                <button class="btn" onclick="connectWiFi()">📡 Verbinden</button>
-            </div>
-            
-            <div id="wifiStatusMsg" class="status"></div>
-        </div>
+<div class="container">
+    <h1>🚍 Bus Display</h1>
+    <p class="subtitle">Konfiguration &amp; Live-Abfahrten</p>
+
+    <div class="tabs">
+        <div class="tab active" onclick="switchTab('stops', this)">🚏 Haltestellen</div>
+        <div class="tab" onclick="switchTab('live', this)">⏱️ Live-Abfahrten</div>
+        <div class="tab" onclick="switchTab('wifi', this)">📡 WiFi</div>
     </div>
 
-    <script>
-        let selectedStops = [];
-        let searchTimeout;
-        
-        // Load config on page load
-        window.addEventListener('load', () => {
-            loadConfig();
-            checkWiFiStatus();
-        });
-        
-        function switchTab(tabName) {
-            // Update tab buttons
-            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-            event.target.classList.add('active');
-            
-            // Update tab content
-            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
-            document.getElementById(`tab-${tabName}`).classList.add('active');
-            
-            // Load tab-specific data
-            if (tabName === 'live') {
-                updateLiveStopSelect();
-            } else if (tabName === 'wifi') {
-                checkWiFiStatus();
-            }
-        }
-        
-        function loadConfig() {
-            fetch('/api/config')
-                .then(r => r.json())
-                .then(data => {
-                    selectedStops = data.stops || [];
-                    updateSelectedStops();
-                });
-        }
-        
-        // Search stops
-        document.getElementById('searchInput').addEventListener('input', (e) => {
-            clearTimeout(searchTimeout);
-            const query = e.target.value;
-            
-            if (query.length < 2) {
-                document.getElementById('results').style.display = 'none';
-                return;
-            }
-            
-            searchTimeout = setTimeout(() => {
-                fetch(`/api/stops?q=${encodeURIComponent(query)}`)
-                    .then(r => r.json())
-                    .then(stops => {
-                        const results = document.getElementById('results');
-                        results.innerHTML = '';
-                        
-                        if (stops.length === 0) {
-                            results.innerHTML = '<div class="result-item">Keine Ergebnisse gefunden</div>';
-                        } else {
-                            stops.forEach(stop => {
-                                const div = document.createElement('div');
-                                div.className = 'result-item';
-                                div.textContent = stop.name;
-                                div.onclick = () => addStop(stop);
-                                results.appendChild(div);
-                            });
-                        }
-                        
-                        results.style.display = 'block';
-                    });
-            }, 300);
-        });
-        
-        function addStop(stop) {
-            if (!selectedStops.find(s => s.id === stop.id)) {
-                selectedStops.push(stop);
+    <!-- ── Haltestellen Tab ─────────────────────────────────── -->
+    <div id="tab-stops" class="tab-content active">
+        <div class="search-box">
+            <label for="searchInput">Haltestelle suchen</label>
+            <input type="text" id="searchInput" placeholder="z.B. Bregenz Bahnhof, Dornbirn...">
+            <div id="results" class="results"></div>
+        </div>
+
+        <label>Ausgewählte Haltestellen</label>
+        <div id="selectedStops" class="selected-stops"></div>
+
+        <button class="btn" onclick="saveConfig()">💾 Konfiguration speichern</button>
+        <div id="status" class="status"></div>
+
+        <!-- ── Ziele ───────────────────────────────────────── -->
+        <hr class="section-divider">
+        <h3>🎯 Ziele definieren</h3>
+        <p style="font-size:13px;color:#666;margin-bottom:14px">
+            Busse die dieses Ziel anfahren werden auf dem Display mit einem Icon markiert.
+        </p>
+
+        <div id="destinationsList"></div>
+
+        <button class="add-btn" onclick="addDestinationRow()">＋ Ziel hinzufügen</button>
+        <button class="btn" onclick="saveDestinations()" style="margin-top:16px">💾 Ziele speichern</button>
+        <div id="destStatus" class="status"></div>
+    </div>
+
+    <!-- ── Live-Abfahrten Tab ──────────────────────────────── -->
+    <div id="tab-live" class="tab-content">
+        <p class="live-header">Alle konfigurierten Haltestellen · nächste 6 Abfahrten</p>
+
+        <div id="liveDepartures" class="departures-live">
+            <p class="loading">Lade Abfahrten…</p>
+        </div>
+
+        <button class="btn secondary" onclick="loadLiveDepartures()" style="margin-top:20px">🔄 Aktualisieren</button>
+    </div>
+
+    <!-- ── WiFi Tab ────────────────────────────────────────── -->
+    <div id="tab-wifi" class="tab-content">
+        <div id="wifiStatus" class="wifi-status">
+            <strong>Status:</strong> <span id="wifiStatusText">Wird geladen…</span>
+        </div>
+        <div class="card">
+            <h3 style="margin-bottom:15px">Mit WiFi verbinden</h3>
+            <label for="wifiSSID">SSID (Netzwerkname)</label>
+            <input type="text" id="wifiSSID" placeholder="MeinWLAN">
+            <label for="wifiPassword">Passwort</label>
+            <input type="password" id="wifiPassword" placeholder="••••••••">
+            <button class="btn" onclick="connectWiFi()">📡 Verbinden</button>
+        </div>
+        <div id="wifiStatusMsg" class="status"></div>
+    </div>
+</div>
+
+<script>
+    const ICON_OPTIONS = [
+        { value: 'home', label: '🏠 Zuhause' },
+        { value: 'work', label: '💼 Firma' },
+        { value: 'star', label: '⭐ Favorit' },
+    ];
+    const ICON_EMOJI = { home: '🏠', work: '💼', star: '⭐' };
+
+    let selectedStops = [];
+    let destinations = [];  // [{name, icon, keywords:[...]}]
+    let searchTimeout;
+
+    window.addEventListener('load', () => {
+        loadConfig();
+        checkWiFiStatus();
+    });
+
+    function switchTab(tabName, el) {
+        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+        el.classList.add('active');
+        document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+        document.getElementById(`tab-${tabName}`).classList.add('active');
+        if (tabName === 'live') loadLiveDepartures();
+        else if (tabName === 'wifi') checkWiFiStatus();
+    }
+
+    // ── Config ────────────────────────────────────────────────
+
+    function loadConfig() {
+        fetch('/api/config')
+            .then(r => r.json())
+            .then(data => {
+                selectedStops = data.stops || [];
+                destinations  = data.destinations || [];
                 updateSelectedStops();
-            }
-            document.getElementById('searchInput').value = '';
+                renderDestinationsList();
+            });
+    }
+
+    function saveConfig() {
+        // Keep destinations when saving stops
+        const config = { stops: selectedStops, destinations };
+        fetch('/api/config', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(config)
+        })
+        .then(r => r.json())
+        .then(() => showStatus('status', 'Konfiguration gespeichert! ✓', 'success'))
+        .catch(() => showStatus('status', 'Fehler beim Speichern', 'error'));
+    }
+
+    // ── Stops ─────────────────────────────────────────────────
+
+    document.getElementById('searchInput').addEventListener('input', (e) => {
+        clearTimeout(searchTimeout);
+        const query = e.target.value;
+        if (query.length < 2) {
             document.getElementById('results').style.display = 'none';
+            return;
         }
-        
-        function removeStop(stopId) {
-            selectedStops = selectedStops.filter(s => s.id !== stopId);
+        searchTimeout = setTimeout(() => {
+            fetch(`/api/stops?q=${encodeURIComponent(query)}`)
+                .then(r => r.json())
+                .then(stops => {
+                    const results = document.getElementById('results');
+                    results.innerHTML = '';
+                    if (stops.length === 0) {
+                        results.innerHTML = '<div class="result-item">Keine Ergebnisse gefunden</div>';
+                    } else {
+                        stops.forEach(stop => {
+                            const div = document.createElement('div');
+                            div.className = 'result-item';
+                            div.textContent = stop.name;
+                            div.onclick = () => addStop(stop);
+                            results.appendChild(div);
+                        });
+                    }
+                    results.style.display = 'block';
+                });
+        }, 300);
+    });
+
+    function addStop(stop) {
+        if (!selectedStops.find(s => s.id === stop.id)) {
+            selectedStops.push({ id: stop.id, name: stop.name });
             updateSelectedStops();
         }
-        
-        function updateSelectedStops() {
-            const container = document.getElementById('selectedStops');
-            container.innerHTML = '';
-            
-            if (selectedStops.length === 0) {
-                container.innerHTML = '<p style="color: #999; padding: 10px 0">Noch keine Haltestellen ausgewählt</p>';
-                return;
-            }
-            
-            selectedStops.forEach(stop => {
-                const chip = document.createElement('span');
-                chip.className = 'stop-chip';
-                chip.innerHTML = `${stop.name} <button onclick="removeStop('${stop.id}')">×</button>`;
-                container.appendChild(chip);
-            });
+        document.getElementById('searchInput').value = '';
+        document.getElementById('results').style.display = 'none';
+    }
+
+    function removeStop(stopId) {
+        selectedStops = selectedStops.filter(s => s.id !== stopId);
+        updateSelectedStops();
+    }
+
+    function updateSelectedStops() {
+        const container = document.getElementById('selectedStops');
+        container.innerHTML = '';
+        if (selectedStops.length === 0) {
+            container.innerHTML = '<p style="color:#999;padding:10px 0">Noch keine Haltestellen ausgewählt</p>';
+            return;
         }
-        
-        function saveConfig() {
-            const config = { stops: selectedStops };
-            
-            fetch('/api/config', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(config)
+        selectedStops.forEach(stop => {
+            const chip = document.createElement('span');
+            chip.className = 'stop-chip';
+            chip.innerHTML = `${stop.name} <button onclick="removeStop('${stop.id}')">×</button>`;
+            container.appendChild(chip);
+        });
+    }
+
+    // ── Destinations ──────────────────────────────────────────
+
+    function renderDestinationsList() {
+        const container = document.getElementById('destinationsList');
+        container.innerHTML = '';
+        destinations.forEach((dest, idx) => renderDestinationRow(container, dest, idx));
+    }
+
+    function addDestinationRow() {
+        destinations.push({ name: '', icon: 'home', keywords: [] });
+        renderDestinationsList();
+        // Focus the new keyword input
+        const rows = document.querySelectorAll('.destination-row');
+        if (rows.length) rows[rows.length - 1].querySelector('input').focus();
+    }
+
+    function renderDestinationRow(container, dest, idx) {
+        const row = document.createElement('div');
+        row.className = 'destination-row';
+        row.dataset.idx = idx;
+
+        // Icon select
+        const sel = document.createElement('select');
+        sel.title = 'Icon';
+        ICON_OPTIONS.forEach(opt => {
+            const o = document.createElement('option');
+            o.value = opt.value;
+            o.textContent = opt.label;
+            if (dest.icon === opt.value) o.selected = true;
+            sel.appendChild(o);
+        });
+        sel.onchange = () => { destinations[idx].icon = sel.value; };
+
+        // Keywords input (comma separated)
+        const inp = document.createElement('input');
+        inp.type = 'text';
+        inp.placeholder = 'z.B. Feldkirch Kloster, Kloster';
+        inp.value = (dest.keywords || []).join(', ');
+        inp.title = 'Stichwörter (Komma-getrennt)';
+        inp.oninput = () => {
+            destinations[idx].keywords = inp.value.split(',').map(k => k.trim()).filter(Boolean);
+        };
+
+        // Remove button
+        const btn = document.createElement('button');
+        btn.className = 'remove-btn';
+        btn.title = 'Entfernen';
+        btn.textContent = '×';
+        btn.onclick = () => {
+            destinations.splice(idx, 1);
+            renderDestinationsList();
+        };
+
+        row.appendChild(sel);
+        row.appendChild(inp);
+        row.appendChild(btn);
+        container.appendChild(row);
+    }
+
+    function saveDestinations() {
+        fetch('/api/destinations', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(destinations)
+        })
+        .then(r => r.json())
+        .then(() => showStatus('destStatus', 'Ziele gespeichert! ✓', 'success'))
+        .catch(() => showStatus('destStatus', 'Fehler beim Speichern', 'error'));
+    }
+
+    // ── Live Departures ───────────────────────────────────────
+
+    function loadLiveDepartures() {
+        const container = document.getElementById('liveDepartures');
+        container.innerHTML = '<p class="loading">Lade Abfahrten…</p>';
+
+        fetch('/api/departures?limit=6')
+            .then(r => r.json())
+            .then(departures => {
+                if (!Array.isArray(departures) || departures.length === 0) {
+                    container.innerHTML = '<p class="loading">Keine Abfahrten in nächster Zeit</p>';
+                    return;
+                }
+                container.innerHTML = '';
+                departures.forEach(dep => {
+                    const div = document.createElement('div');
+                    div.className = 'departure-item';
+
+                    const time = new Date(dep.departure_time);
+                    const minutesUntil = Math.round((time - Date.now()) / 60000);
+                    const timeStr = minutesUntil <= 0 ? 'Jetzt' : `${minutesUntil} min`;
+                    const iconHtml = dep.icon ? `<span class="departure-icon">${ICON_EMOJI[dep.icon] || ''}</span>` : '';
+                    const delayHtml = dep.delay_minutes ? `<span class="departure-delay">+${dep.delay_minutes}</span>` : '';
+
+                    div.innerHTML = `
+                        <span class="departure-line">${dep.line}</span>
+                        <span class="departure-destination">${iconHtml}${dep.destination}</span>
+                        <span class="departure-time">${timeStr}${delayHtml}</span>
+                    `;
+                    container.appendChild(div);
+                });
             })
+            .catch(() => {
+                container.innerHTML = '<p class="loading">Fehler beim Laden der Abfahrten</p>';
+            });
+    }
+
+    // ── WiFi ──────────────────────────────────────────────────
+
+    function checkWiFiStatus() {
+        fetch('/api/wifi/status')
             .then(r => r.json())
             .then(data => {
-                showStatus('status', 'Konfiguration gespeichert! ✓', 'success');
-            })
-            .catch(err => {
-                showStatus('status', 'Fehler beim Speichern', 'error');
-            });
-        }
-        
-        // Live Departures
-        function updateLiveStopSelect() {
-            const select = document.getElementById('liveStopSelect');
-            select.innerHTML = '<option value="">-- Bitte wählen --</option>';
-            
-            selectedStops.forEach(stop => {
-                const option = document.createElement('option');
-                option.value = stop.id;
-                option.textContent = stop.name;
-                select.appendChild(option);
-            });
-        }
-        
-        function loadLiveDepartures() {
-            const stopId = document.getElementById('liveStopSelect').value;
-            const container = document.getElementById('liveDepartures');
-            
-            if (!stopId) {
-                container.innerHTML = '<p class="loading">Wähle eine Haltestelle um Live-Abfahrten zu sehen</p>';
-                return;
-            }
-            
-            container.innerHTML = '<p class="loading">Lade Abfahrten...</p>';
-            
-            fetch(`/api/departures?stop_id=${stopId}&limit=10`)
-                .then(r => r.json())
-                .then(departures => {
-                    if (departures.length === 0) {
-                        container.innerHTML = '<p class="loading">Keine Abfahrten in nächster Zeit</p>';
-                        return;
-                    }
-                    
-                    container.innerHTML = '';
-                    departures.forEach(dep => {
-                        const div = document.createElement('div');
-                        div.className = 'departure-item';
-                        
-                        const time = new Date(dep.departure_time);
-                        const now = new Date();
-                        const minutesUntil = Math.round((time - now) / 60000);
-                        
-                        let timeStr = minutesUntil <= 0 ? 'Jetzt' : `${minutesUntil} min`;
-                        
-                        div.innerHTML = `
-                            <span class="departure-line">${dep.line}</span>
-                            <span class="departure-destination">${dep.destination}</span>
-                            <span class="departure-time">${timeStr}${dep.delay_minutes ? `<span class="departure-delay">+${dep.delay_minutes}</span>` : ''}</span>
-                        `;
-                        container.appendChild(div);
-                    });
-                })
-                .catch(err => {
-                    container.innerHTML = '<p class="loading">Fehler beim Laden der Abfahrten</p>';
-                });
-        }
-        
-        // WiFi
-        function checkWiFiStatus() {
-            fetch('/api/wifi/status')
-                .then(r => r.json())
-                .then(data => {
-                    const status = document.getElementById('wifiStatusText');
-                    const container = document.getElementById('wifiStatus');
-                    
-                    if (data.connected) {
-                        status.textContent = `Verbunden mit "${data.ssid}"`;
-                        container.classList.add('connected');
-                    } else {
-                        status.textContent = 'Nicht verbunden';
-                        container.classList.remove('connected');
-                    }
-                })
-                .catch(err => {
-                    document.getElementById('wifiStatusText').textContent = 'Status unbekannt';
-                });
-        }
-        
-        function connectWiFi() {
-            const ssid = document.getElementById('wifiSSID').value;
-            const password = document.getElementById('wifiPassword').value;
-            
-            if (!ssid || !password) {
-                showStatus('wifiStatusMsg', 'Bitte SSID und Passwort eingeben', 'error');
-                return;
-            }
-            
-            showStatus('wifiStatusMsg', 'Verbinde...', 'info');
-            
-            fetch('/api/wifi/connect', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ ssid, password })
-            })
-            .then(r => r.json())
-            .then(data => {
-                if (data.success) {
-                    showStatus('wifiStatusMsg', 'Verbindung erfolgreich! ✓', 'success');
-                    setTimeout(checkWiFiStatus, 2000);
+                const statusText = document.getElementById('wifiStatusText');
+                const box = document.getElementById('wifiStatus');
+                if (data.connected) {
+                    statusText.textContent = `Verbunden mit "${data.ssid}"`;
+                    box.classList.add('connected');
                 } else {
-                    showStatus('wifiStatusMsg', data.error || 'Verbindung fehlgeschlagen', 'error');
+                    statusText.textContent = 'Nicht verbunden';
+                    box.classList.remove('connected');
                 }
             })
-            .catch(err => {
-                showStatus('wifiStatusMsg', 'Fehler beim Verbinden', 'error');
-            });
+            .catch(() => { document.getElementById('wifiStatusText').textContent = 'Status unbekannt'; });
+    }
+
+    function connectWiFi() {
+        const ssid     = document.getElementById('wifiSSID').value;
+        const password = document.getElementById('wifiPassword').value;
+        if (!ssid || !password) {
+            showStatus('wifiStatusMsg', 'Bitte SSID und Passwort eingeben', 'error');
+            return;
         }
-        
-        function showStatus(elementId, message, type) {
-            const status = document.getElementById(elementId);
-            status.textContent = message;
-            status.className = `status ${type}`;
-            status.style.display = 'block';
-            
-            setTimeout(() => {
-                status.style.display = 'none';
-            }, 5000);
-        }
-    </script>
+        showStatus('wifiStatusMsg', 'Verbinde…', 'info');
+        fetch('/api/wifi/connect', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ssid, password })
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) {
+                showStatus('wifiStatusMsg', 'Verbindung erfolgreich! ✓', 'success');
+                setTimeout(checkWiFiStatus, 2000);
+            } else {
+                showStatus('wifiStatusMsg', data.error || 'Verbindung fehlgeschlagen', 'error');
+            }
+        })
+        .catch(() => showStatus('wifiStatusMsg', 'Fehler beim Verbinden', 'error'));
+    }
+
+    // ── Helpers ───────────────────────────────────────────────
+
+    function showStatus(elementId, message, type) {
+        const el = document.getElementById(elementId);
+        el.textContent = message;
+        el.className = `status ${type}`;
+        el.style.display = 'block';
+        setTimeout(() => { el.style.display = 'none'; }, 5000);
+    }
+</script>
 </body>
 </html>

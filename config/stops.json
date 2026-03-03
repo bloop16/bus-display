@@ -8,5 +8,22 @@
       "id": "at:48:585:0:1",
       "name": "Dornbirn Bahnhof"
     }
+  ],
+  "destinations": [
+    {
+      "name": "Zuhause",
+      "icon": "home",
+      "keywords": ["Feldkirch Kloster"]
+    },
+    {
+      "name": "Firma",
+      "icon": "work",
+      "keywords": ["Feldkirch Busplatz"]
+    },
+    {
+      "name": "Favorit",
+      "icon": "star",
+      "keywords": []
+    }
   ]
 }

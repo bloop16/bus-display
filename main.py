@@ -17,39 +17,55 @@ class BusDisplay:
         self.renderer = DisplayRenderer()
         self.display = DisplayDriver(mock=mock_display)
         self.pisugar = PiSugar(mock=mock_battery)
-        self.stops = []
-        self.load_config()
         self.button_pressed = False
-        self.pisugar.register_button_callback(lambda: setattr(self, 'button_pressed', True) or self.update_display())
-    
-    def load_config(self):
+        self.pisugar.register_button_callback(
+            lambda: setattr(self, 'button_pressed', True) or self.update_display()
+        )
+
+    def _load_config(self) -> dict:
         if self.config_path.exists():
-            self.stops = json.load(open(self.config_path)).get('stops', [])
-    
+            return json.load(open(self.config_path))
+        return {'stops': [], 'destinations': []}
+
     def update_display(self):
-        if not self.stops: return
-        stop = self.stops[0]
-        logger.info(f"Update {stop['name']}...")
+        config = self._load_config()
+        stops = config.get('stops', [])
+        destinations = config.get('destinations', [])
+
+        if not stops:
+            logger.warning("No stops configured")
+            return
+
+        stop_label = " & ".join(s['name'] for s in stops[:2])
+        logger.info(f"Update: {stop_label}")
+
         try:
-            deps = self.api.get_departures(stop_id=stop['id'], limit=4)
+            deps = self.api.get_all_departures(stops, destinations, limit=6)
             bat = self.pisugar.get_battery_level()
-            img = self.renderer.render_departures(deps, stop['name'], battery_percent=bat)
+            img = self.renderer.render_departures(deps, stop_label, battery_percent=bat)
             self.display.display_image(img)
             self.button_pressed = False
         except Exception as e:
-            logger.error(f"Fail: {e}")
-    
-    def run_once(self): self.update_display()
-    
+            logger.error(f"Update failed: {e}")
+
+    def run_once(self):
+        self.update_display()
+
     def run_continuous(self, interval=5):
         mode = "auto" if self.pisugar.is_charging() else "button"
         logger.info(f"Mode: {mode}")
         while True:
             try:
-                if mode == "auto": self.update_display(); time.sleep(interval * 60)
-                elif mode == "button": time.sleep(1) if not self.button_pressed else None
-            except KeyboardInterrupt: break
-            except: time.sleep(60)
+                if mode == "auto":
+                    self.update_display()
+                    time.sleep(interval * 60)
+                elif mode == "button":
+                    if not self.button_pressed:
+                        time.sleep(1)
+            except KeyboardInterrupt:
+                break
+            except Exception:
+                time.sleep(60)
 
 if __name__ == '__main__':
     import argparse
