@@ -1,10 +1,8 @@
 """
 VMobil.at API client for fetching bus departures.
-Uses web scraping since public API is not available.
+Uses GTFS schedule data with real-time scraping as best-effort.
 """
-import requests
-from bs4 import BeautifulSoup
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import List, Dict, Optional
 from dataclasses import dataclass, asdict
 import logging
@@ -35,16 +33,8 @@ class Departure:
 
 class VMobilAPI:
     """Client for vmobil.at bus departure data"""
-    
-    BASE_URL = "https://www.vmobil.at"
-    
-    def __init__(self, timeout: int = 10):
-        self.timeout = timeout
-        self.session = requests.Session()
-        self.session.headers.update({
-            'User-Agent': 'BusDisplay/1.0 (Raspberry Pi)'
-        })
-        
+
+    def __init__(self):
         # GTFS Loader für echte Haltestellen-Daten
         try:
             from .gtfs_loader import get_gtfs_loader
@@ -187,64 +177,3 @@ class VMobilAPI:
 
         logger.warning(f"No live or GTFS departures available for stop {stop_id or stop_name}")
         return []
-    
-    def _resolve_stop_id(self, stop_id: str) -> str:
-        """Convert stop ID to name (for scraping)"""
-        # Real HAFAS IDs from VMobil
-        id_map = {
-            '490085500': 'Bregenz Bahnhof',
-            '490085600': 'Bregenz Hafen',
-            '490085700': 'Bregenz Landeskrankenhaus',
-            '490078100': 'Dornbirn Bahnhof',
-            '490078200': 'Dornbirn Zentrum',
-            '490076500': 'Feldkirch Bahnhof',
-            '490079100': 'Rankweil Bahnhof',
-            '490079200': 'Rankweil Konkordiaplatz',
-            # Legacy test IDs
-            '1': 'Bregenz Bahnhof',
-            '2': 'Bregenz Hafen',
-            'test_stop': 'Test Stop'
-        }
-        return id_map.get(stop_id, stop_id)
-    
-    def _parse_time(self, time_str: str) -> datetime:
-        """
-        Parse time string from vmobil.at to datetime.
-        
-        Args:
-            time_str: Time in format "HH:MM" (e.g. "14:35")
-            
-        Returns:
-            datetime object with today's date and parsed time
-        """
-        try:
-            hour, minute = map(int, time_str.split(':'))
-            now = datetime.now()
-            parsed = now.replace(hour=hour, minute=minute, second=0, microsecond=0)
-            
-            # If time is in the past, assume it's tomorrow
-            if parsed < now:
-                parsed += timedelta(days=1)
-            
-            return parsed
-        except (ValueError, AttributeError) as e:
-            raise VMobilAPIError(f"Invalid time format: {time_str}")
-
-    def enable_real_scraping(self):
-        """Switch to real VMobil scraping instead of mock data"""
-        from .vmobil_scraper import VMobilScraper
-        self.scraper = VMobilScraper()
-        self.use_real_data = True
-        logger.info("Real scraping enabled")
-    
-    def search_stops_real(self, query: str, limit: int = 10) -> List[dict]:
-        """Search stops using real scraper"""
-        if hasattr(self, 'scraper'):
-            return self.scraper.search_stops(query, limit)
-        return self.search_stops(query, limit)  # Fallback to mock
-    
-    def get_departures_real(self, stop_id: str, limit: int = 10) -> List[Departure]:
-        """Get departures using real scraper"""
-        if hasattr(self, 'scraper'):
-            return self.scraper.get_departures(stop_id, limit)
-        return self.get_departures(stop_id, limit)  # Fallback to mock

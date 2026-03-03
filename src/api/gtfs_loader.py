@@ -15,7 +15,11 @@ from collections import defaultdict
 
 logger = logging.getLogger(__name__)
 
-GTFS_URL = "https://mobilitydata.gv.at/sites/default/files/metadataset/sample_data/20231229-0218_gtfs_vmobil_2024.zip"
+# Aktuelle GTFS-URL vom österreichischen Open-Data-Katalog.
+# Primärquelle: data.gv.at Katalog-API → holt automatisch die aktuelle Download-URL.
+# Fallback: direkter Datei-Link (muss ggf. manuell aktualisiert werden).
+GTFS_CATALOG_API = "https://www.data.gv.at/api/3/action/package_show?id=fahrplandaten-vmobil-vorarlberg"
+GTFS_URL_FALLBACK = "https://mobilitydata.gv.at/sites/default/files/metadataset/sample_data/20231229-0218_gtfs_vmobil_2024.zip"
 CACHE_DIR = Path(__file__).parent.parent.parent / "data"
 STOPS_CACHE_FILE = CACHE_DIR / "stops.json"
 SCHEDULE_CACHE_FILE = CACHE_DIR / "schedule.json"
@@ -88,11 +92,30 @@ class GTFSLoader:
             logger.error(f"Failed to load schedule cache: {e}. Fetching fresh data.")
             self._fetch_and_parse()
 
+    def _resolve_gtfs_url(self) -> str:
+        """Resolve current GTFS download URL via data.gv.at catalog API."""
+        try:
+            logger.info("Fetching current GTFS URL from data.gv.at catalog...")
+            resp = requests.get(GTFS_CATALOG_API, timeout=10)
+            resp.raise_for_status()
+            data = resp.json()
+            resources = data.get('result', {}).get('resources', [])
+            for res in resources:
+                url = res.get('url', '')
+                if url.endswith('.zip') and 'gtfs' in url.lower():
+                    logger.info(f"Catalog GTFS URL: {url}")
+                    return url
+        except Exception as e:
+            logger.warning(f"Catalog API failed: {e}")
+        logger.warning(f"Using fallback GTFS URL: {GTFS_URL_FALLBACK}")
+        return GTFS_URL_FALLBACK
+
     def _fetch_and_parse(self):
         """Fetch GTFS ZIP and parse stops.txt"""
         try:
-            logger.info(f"Downloading GTFS from {GTFS_URL}")
-            response = requests.get(GTFS_URL, timeout=30)
+            gtfs_url = self._resolve_gtfs_url()
+            logger.info(f"Downloading GTFS from {gtfs_url}")
+            response = requests.get(gtfs_url, timeout=60)
             response.raise_for_status()
 
             # Save ZIP to temp location
@@ -126,7 +149,7 @@ class GTFSLoader:
                 logger.info(f"Parsing {stops_file}")
 
                 with zip_file.open(stops_file) as f:
-                    reader = csv.DictReader(f.read().decode('utf-8').splitlines())
+                    reader = csv.DictReader(f.read().decode('utf-8-sig').splitlines())
                     stops = []
                     for row in reader:
                         stop = {
@@ -159,7 +182,7 @@ class GTFSLoader:
                 return
 
             with zip_file.open(routes_files[0]) as f:
-                reader = csv.DictReader(f.read().decode('utf-8').splitlines())
+                reader = csv.DictReader(f.read().decode('utf-8-sig').splitlines())
                 self.routes_data = {
                     row.get('route_id', ''): {
                         'short_name': row.get('route_short_name', '') or row.get('route_id', ''),
@@ -169,7 +192,7 @@ class GTFSLoader:
                 }
 
             with zip_file.open(trips_files[0]) as f:
-                reader = csv.DictReader(f.read().decode('utf-8').splitlines())
+                reader = csv.DictReader(f.read().decode('utf-8-sig').splitlines())
                 self.trips_data = {
                     row.get('trip_id', ''): {
                         'route_id': row.get('route_id', ''),
@@ -180,7 +203,7 @@ class GTFSLoader:
 
             self.stop_times_index = defaultdict(list)
             with zip_file.open(stop_times_files[0]) as f:
-                reader = csv.DictReader(f.read().decode('utf-8').splitlines())
+                reader = csv.DictReader(f.read().decode('utf-8-sig').splitlines())
                 for row in reader:
                     stop_id = row.get('stop_id', '')
                     trip_id = row.get('trip_id', '')

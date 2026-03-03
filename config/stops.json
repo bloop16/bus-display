@@ -1,12 +1,12 @@
 {
   "stops": [
     {
-      "id": "1",
+      "id": "at:48:452:0:1",
       "name": "Bregenz Bahnhof"
     },
     {
-      "id": "2",
-      "name": "Bregenz Hafen"
+      "id": "at:48:585:0:1",
+      "name": "Dornbirn Bahnhof"
     }
   ]
 }

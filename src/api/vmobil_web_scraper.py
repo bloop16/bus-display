@@ -106,7 +106,7 @@ class VMobilWebScraper:
             if response.status_code == 200:
                 data = response.json()
                 if 'departures' in data:
-                    return self._parse_departures(data['departures'], stop_name)
+                    return self._parse_departures(data['departures'], stop_name, limit)
         except:
             pass
         
@@ -129,10 +129,10 @@ class VMobilWebScraper:
         logger.warning(f"No live departures available for {stop_name}")
         return []
     
-    def _parse_departures(self, data: list, stop_name: str) -> list:
+    def _parse_departures(self, data: list, stop_name: str, limit: int = 10) -> list:
         """Parse API response"""
         departures = []
-        
+
         for dep in data[:limit]:
             try:
                 departures.append({
