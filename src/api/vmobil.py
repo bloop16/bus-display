@@ -203,3 +203,22 @@ class VMobilAPI:
             return parsed
         except (ValueError, AttributeError) as e:
             raise VMobilAPIError(f"Invalid time format: {time_str}")
+
+    def enable_real_scraping(self):
+        """Switch to real VMobil scraping instead of mock data"""
+        from .vmobil_scraper import VMobilScraper
+        self.scraper = VMobilScraper()
+        self.use_real_data = True
+        logger.info("Real scraping enabled")
+    
+    def search_stops_real(self, query: str, limit: int = 10) -> List[dict]:
+        """Search stops using real scraper"""
+        if hasattr(self, 'scraper'):
+            return self.scraper.search_stops(query, limit)
+        return self.search_stops(query, limit)  # Fallback to mock
+    
+    def get_departures_real(self, stop_id: str, limit: int = 10) -> List[Departure]:
+        """Get departures using real scraper"""
+        if hasattr(self, 'scraper'):
+            return self.scraper.get_departures(stop_id, limit)
+        return self.get_departures(stop_id, limit)  # Fallback to mock
