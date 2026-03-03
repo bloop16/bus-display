@@ -1,0 +1,16 @@
+[Unit]
+Description=Bus Display Web Interface
+After=network.target
+
+[Service]
+Type=simple
+User=pi
+WorkingDirectory=/home/pi/bus-display
+ExecStart=/usr/bin/python3 -m src.web.app
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

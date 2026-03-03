@@ -1,0 +1,17 @@
+[Unit]
+Description=Bus Display Controller
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=pi
+WorkingDirectory=/home/pi/bus-display
+ExecStart=/usr/bin/python3 /home/pi/bus-display/main.py --continuous --interval 5
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
