@@ -13,10 +13,11 @@ Powered by VMobil.at | Open Source | Raspberry Pi Zero W
 
 - **📺 E-Ink Display** (Waveshare 2.13") - stromsparend, immer sichtbar
 - **🚏 Live-Abfahrten** - Echte Daten von VMobil.at
-- **📱 Web-Interface** - 3 Tabs für einfache Konfiguration
+- **📱 Web-Interface** - 3 Tabs für einfache Konfiguration (Haltestellen speichern!)
 - **📡 WiFi Setup** - Hotspot für erste Einrichtung
 - **🔋 Smart Power** - Battery-Modus mit PiSugar (optional)
-- **🏠 Offline Mode** - Funktioniert auch ohne Internet (mit Caching)
+- **🏠 Offline Mode** - Funktioniert auch ohne Internet (GTFS-Caching)
+- **🗺️ GTFS-Daten** - Offizielle Fahrplandaten von data.mobilitaetsverbuende.at
 
 ---
 
@@ -61,19 +62,21 @@ sudo ./install.sh
 ## 📋 Web-Interface Tabs
 
 ### 🚏 Haltestellen
-- Suche nach Lieblingshaltstellen
-- Speichere Favoriten
-- Live-Preview
+- Suche nach Lieblingshaltstellen (mit GTFS-Daten)
+- **Speichere Favoriten** - Werden persistent gespeichert
+- Live-Preview der gefundenen Stationen
+- Verwaltung von bis zu 5 Favoritenhaltestellen
 
 ### ⏱️ Live-Abfahrten  
-- Nächste Busse in Echtzeit
-- Verspätungen anzeigen
-- Auto-Refresh
+- Nächste Busse in Echtzeit (Web-scraping)
+- Verspätungsanzeige (±min)
+- Auto-Refresh alle 30 Sekunden
+- Fallback auf GTFS-Sollzeiten wenn Live-Daten fehlen
 
 ### 📡 WiFi
 - WiFi-Verbindung einrichten
-- Status prüfen
-- Hotspot-Info
+- Status prüfen (Connected/Standby)
+- Hotspot-Info für Setup
 
 ---
 
@@ -96,7 +99,29 @@ eBusDisplay/
 
 ---
 
-## 💻 Entwicklung
+## �️ Datenquellen
+
+### GTFS - Fahrplandaten
+eBusDisplay nutzt **offizielle GTFS-Daten** vom österreichischen Mobilitätsdaten-Portal:
+- **Portal:** https://data.mobilitaetsverbuende.at/de/data-sets
+- **Verband:** Verkehrsverbund Vorarlberg (VMobil)
+- **Format:** GTFS (Static Schedule)
+- **Updates:** Tägliche Aktualisierungen wenn Fahrpläne ändern
+- **Abdeckung:** Alle öffentlichen Verkehrsmittel in Vorarlberg
+
+### Live-Daten - Web-Scraping
+Für **Echtzeit-Verspätungen** scrapt eBusDisplay die VMobil-Webseite:
+- **Quelle:** https://www.vmobil.at
+- **Verspätungen:** Aus aktuellen Bus-Positionen extrahiert
+- **Fallback:** GTFS-Sollzeiten wenn Live-Daten nicht verfügbar
+
+### Lokales Caching
+- **GTFS-Cache:** 24h lokales Caching (funktioniert offline)
+- **Config:** Gespeicherte Haltestellen in `config/stops.json`
+
+---
+
+## �💻 Entwicklung
 
 **Tests ausführen:**
 ```bash

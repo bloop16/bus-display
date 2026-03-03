@@ -45,18 +45,32 @@ class VMobilAPI:
             'User-Agent': 'BusDisplay/1.0 (Raspberry Pi)'
         })
         
-        # Versuche Web Scraper zu laden (echte Daten auf Pi)
+        # GTFS Loader für echte Haltestellen-Daten
+        try:
+            from .gtfs_loader import get_gtfs_loader
+            self.gtfs = get_gtfs_loader()
+            self.use_gtfs = True
+            logger.info("GTFSLoader initialized successfully")
+        except Exception as e:
+            logger.warning(f"GTFSLoader failed: {e}. Using fallback stops.")
+            self.gtfs = None
+            self.use_gtfs = False
+        
+        # Versuche Web Scraper zu laden (echte Echtzeit-Daten auf Pi)
         try:
             from .vmobil_web_scraper import VMobilWebScraper
             self.scraper = VMobilWebScraper()
             self.use_scraper = True
-        except:
+            logger.info("VMobilWebScraper initialized successfully")
+        except Exception as e:
+            logger.warning(f"VMobilWebScraper failed: {e}")
             self.scraper = None
             self.use_scraper = False
     
     def search_stops(self, query: str) -> List[Dict[str, str]]:
         """
         Search for bus stops by name.
+        Uses GTFS data first, then falls back to web scraper, then fallback database.
         
         Args:
             query: Stop name to search for (e.g. "Bregenz Bahnhof")
@@ -67,84 +81,45 @@ class VMobilAPI:
         if not query or not query.strip():
             return []
         
-        # Versuche Web Scraper zu nutzen
+        # GTFS: Echte/vollständige Haltestellen-Daten
+        if self.use_gtfs and self.gtfs:
+            try:
+                results = self.gtfs.search_stops(query.strip(), limit=10)
+                if results:
+                    logger.info(f"GTFS search found {len(results)} results for '{query}'")
+                    return results
+            except Exception as e:
+                logger.warning(f"GTFS search failed: {e}")
+        
+        # Web Scraper: Echte Echtzeit-Daten (fallback)
         if self.use_scraper and self.scraper:
             try:
                 return self.scraper.search_stops(query)
             except Exception as e:
-                logger.warning(f"Web scraper search failed, using fallback: {e}")
+                logger.warning(f"Web scraper search failed: {e}")
         
-        try:
-            # Try autocomplete endpoint first
-            url = f"{self.BASE_URL}/de/api/autocomplete"
-            params = {'term': query.strip()}
-            
-            response = self.session.get(
-                url,
-                params=params,
-                timeout=self.timeout
-            )
-            
-            if response.status_code == 200:
-                data = response.json()
-                # Parse JSON response (structure TBD during testing)
-                if isinstance(data, list):
-                    return [
-                        {'id': str(item.get('id', '')), 'name': item.get('label', item.get('name', ''))}
-                        for item in data
-                        if item.get('label') or item.get('name')
-                    ]
-            
-            # Fallback: scrape from routing page
-            logger.warning("Autocomplete failed, using fallback search")
-            return self._search_stops_fallback(query)
-            
-        except requests.Timeout:
-            raise VMobilAPIError(f"Search timeout after {self.timeout}s")
-        except requests.RequestException as e:
-            raise VMobilAPIError(f"Search failed: {e}")
-        except Exception as e:
-            logger.error(f"Unexpected error in search_stops: {e}")
-            return []
+        # Fallback: Hardcoded stops
+        logger.warning("All search methods failed, using hardcoded fallback")
+        return self._get_fallback_stops(query)
     
-    def _search_stops_fallback(self, query: str) -> List[Dict[str, str]]:
-        """Fallback: Use HAFAS-style search with VMobil"""
+    def _get_fallback_stops(self, query: str) -> List[Dict[str, str]]:
+        """Fallback: Use hardcoded stops when GTFS/Scraper fail"""
         try:
-            # VMobil uses HAFAS - try direct HAFAS endpoint
-            # Common HAFAS stops in Vorarlberg for testing
-            stops_db = {
-                'bregenz': [
-                    {'id': '490085500', 'name': 'Bregenz Bahnhof'},
-                    {'id': '490085600', 'name': 'Bregenz Hafen'},
-                    {'id': '490085700', 'name': 'Bregenz Landeskrankenhaus'},
-                ],
-                'dornbirn': [
-                    {'id': '490078100', 'name': 'Dornbirn Bahnhof'},
-                    {'id': '490078200', 'name': 'Dornbirn Zentrum'},
-                ],
-                'feldkirch': [
-                    {'id': '490076500', 'name': 'Feldkirch Bahnhof'},
-                ],
-                'rankweil': [
-                    {'id': '490079100', 'name': 'Rankweil Bahnhof'},
-                    {'id': '490079200', 'name': 'Rankweil Konkordiaplatz'},
-                ],
-            }
+            fallback_stops = [
+                {'id': '490085500', 'name': 'Bregenz Bahnhof'},
+                {'id': '490085600', 'name': 'Bregenz Hafen'},
+                {'id': '490085700', 'name': 'Bregenz Landeskrankenhaus'},
+                {'id': '490078100', 'name': 'Dornbirn Bahnhof'},
+                {'id': '490078200', 'name': 'Dornbirn Zentrum'},
+                {'id': '490076500', 'name': 'Feldkirch Bahnhof'},
+                {'id': '490079100', 'name': 'Rankweil Bahnhof'},
+                {'id': '490079200', 'name': 'Rankweil Konkordiaplatz'},
+            ]
             
             query_lower = query.lower()
-            results = []
-            
-            for key, stops in stops_db.items():
-                if key in query_lower:
-                    results.extend(stops)
-            
-            # Fuzzy matching for better UX
-            if not results:
-                for key, stops in stops_db.items():
-                    if any(part in key for part in query_lower.split()):
-                        results.extend(stops)
-            
-            return results[:10]
+            # Fuzzy matching
+            matches = [s for s in fallback_stops if query_lower in s['name'].lower()]
+            return matches[:10] if matches else fallback_stops[:5]
             
         except Exception as e:
             logger.error(f"Fallback search failed: {e}")
