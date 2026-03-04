@@ -278,6 +278,18 @@
             .then(data => {
                 selectedStops = data.stops || [];
                 destinations  = data.destinations || [];
+                destinations.forEach(dest => {
+                    if (!Array.isArray(dest.via_stops)) dest.via_stops = [];
+                    dest.via_stops = dest.via_stops
+                        .filter(v => v && v.name)
+                        .map(v => {
+                            const ids = Array.isArray(v.ids) && v.ids.length
+                                ? v.ids.filter(Boolean)
+                                : (v.id ? [v.id] : []);
+                            const id = v.id || ids[0] || null;
+                            return { id, name: v.name, ids };
+                        });
+                });
                 updateSelectedStops();
                 renderDestinationsList();
             });
@@ -427,8 +439,18 @@
                             d.className = 'md-list-item';
                             d.innerHTML = '<span class="material-icons-round">place</span>' + s.name;
                             if (s.id) d.onclick = () => {
-                                if (!destinations[idx].via_stops.find(v => v.id === s.id))
-                                    destinations[idx].via_stops.push({ id: s.id, name: s.name });
+                                const incomingIds = (Array.isArray(s.ids) && s.ids.length) ? s.ids : [s.id];
+                                const exists = destinations[idx].via_stops.some(v => {
+                                    const existingIds = (Array.isArray(v.ids) && v.ids.length) ? v.ids : [v.id];
+                                    return existingIds.some(id => incomingIds.includes(id));
+                                });
+                                if (!exists) {
+                                    destinations[idx].via_stops.push({
+                                        id: s.id,
+                                        name: s.name,
+                                        ids: incomingIds
+                                    });
+                                }
                                 renderChips(); inp.value = ''; resList.style.display = 'none';
                             };
                             resList.appendChild(d);
@@ -445,7 +467,10 @@
 
     function removeViaStop(idx, stopId) {
         if (destinations[idx]) {
-            destinations[idx].via_stops = destinations[idx].via_stops.filter(v => v.id !== stopId);
+            destinations[idx].via_stops = destinations[idx].via_stops.filter(v => {
+                const ids = (Array.isArray(v.ids) && v.ids.length) ? v.ids : [v.id];
+                return !ids.includes(stopId);
+            });
             renderDestinationsList();
         }
     }

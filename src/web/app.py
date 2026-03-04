@@ -36,6 +36,63 @@ def create_app(testing=False, api=None, on_config_saved=None):
         with open(CONFIG_FILE, 'w') as f:
             json.dump(config, f, indent=2)
 
+    def _normalize_destinations(destinations: list) -> list:
+        """Normalisiert destinations/via_stops für robustes GTFS-Matching."""
+        if not isinstance(destinations, list):
+            return []
+
+        normalized = []
+        for entry in destinations:
+            if not isinstance(entry, dict):
+                continue
+
+            icon = entry.get('icon')
+            keywords = entry.get('keywords') if isinstance(entry.get('keywords'), list) else []
+
+            via_stops_normalized = []
+            for via in (entry.get('via_stops') or []):
+                if not isinstance(via, dict):
+                    continue
+
+                via_name = via.get('name')
+                if not via_name:
+                    continue
+
+                via_id = via.get('id')
+                via_ids = via.get('ids') if isinstance(via.get('ids'), list) else None
+                if not via_ids:
+                    via_ids = [via_id] if via_id else []
+
+                if len(via_ids) <= 1:
+                    try:
+                        matches = api.search_stops(via_name)
+                        exact = next((m for m in matches if m.get('name') == via_name), None)
+                        if exact:
+                            via_id = exact.get('id') or via_id
+                            via_ids = exact.get('ids') or via_ids
+                    except Exception as e:
+                        logger.debug(f'Via-Stop normalization lookup failed for {via_name}: {e}')
+
+                via_ids = [sid for sid in via_ids if sid]
+                if via_id and via_id not in via_ids:
+                    via_ids.insert(0, via_id)
+                if not via_id and via_ids:
+                    via_id = via_ids[0]
+
+                via_stops_normalized.append({
+                    'id': via_id,
+                    'name': via_name,
+                    'ids': via_ids,
+                })
+
+            normalized.append({
+                'icon': icon,
+                'keywords': keywords,
+                'via_stops': via_stops_normalized,
+            })
+
+        return normalized
+
     @app.route('/')
     def index():
         return render_template('index.html')
@@ -92,6 +149,7 @@ def create_app(testing=False, api=None, on_config_saved=None):
         if not config or 'stops' not in config:
             return jsonify({'error': 'Invalid config'}), 400
         try:
+            config['destinations'] = _normalize_destinations(config.get('destinations', []))
             _save_config(config)
             logger.info(f'Config saved: {len(config["stops"])} stops, '
                         f'{len(config.get("destinations", []))} destinations')
@@ -119,7 +177,7 @@ def create_app(testing=False, api=None, on_config_saved=None):
             return jsonify({'error': 'Expected a list of destinations'}), 400
         try:
             config = _load_config()
-            config['destinations'] = destinations
+            config['destinations'] = _normalize_destinations(destinations)
             _save_config(config)
             logger.info(f'Destinations saved: {len(destinations)} entries')
             return jsonify({'status': 'ok'})

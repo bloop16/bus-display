@@ -390,6 +390,64 @@ class GTFSLoader:
             return False
         return via_seq > boarding_seq
 
+    def find_trip_id_for_departure(
+        self,
+        stop_id: str,
+        line: str,
+        departure_time: datetime,
+        destination: Optional[str] = None,
+        max_diff_minutes: int = 8,
+    ) -> Optional[str]:
+        """Best-effort Zuordnung Live-Abfahrt -> GTFS trip_id (Stop+Linie+Zeit+Ziel)."""
+        entries = self.stop_times_index.get(stop_id, [])
+        if not entries:
+            return None
+
+        target_sec = (
+            departure_time.hour * 3600
+            + departure_time.minute * 60
+            + departure_time.second
+        )
+        line_norm = str(line or '').strip().lower()
+        dest_norm = str(destination or '').strip().lower()
+
+        best_trip_id = None
+        best_score = None
+
+        for entry in entries:
+            trip_id = entry.get('trip_id')
+            dep_str = entry.get('departure_time')
+            if not trip_id or not dep_str:
+                continue
+
+            dep_sec = self._gtfs_time_to_seconds(dep_str)
+            if dep_sec is None:
+                continue
+            dep_sec %= 24 * 3600
+
+            diff = abs(dep_sec - target_sec)
+            diff = min(diff, 24 * 3600 - diff)
+            if diff > max_diff_minutes * 60:
+                continue
+
+            trip = self.trips_data.get(trip_id, {})
+            route_id = trip.get('route_id')
+            route = self.routes_data.get(route_id, {}) if route_id else {}
+            trip_line = str(route.get('short_name') or '').strip().lower()
+            headsign = str(trip.get('headsign') or '').strip().lower()
+
+            score = int(diff)
+            if line_norm and trip_line and trip_line == line_norm:
+                score -= 120
+            if dest_norm and headsign and (dest_norm in headsign or headsign in dest_norm):
+                score -= 60
+
+            if best_score is None or score < best_score:
+                best_score = score
+                best_trip_id = trip_id
+
+        return best_trip_id
+
     def get_stop(self, stop_id: str) -> dict:
         """Get stop details by ID"""
         return self.stops_data.get(stop_id, {})

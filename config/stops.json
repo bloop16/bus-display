@@ -1,57 +1,13 @@
 {
   "stops": [
     {
-      "id": "at:48:1453:0:1",
-      "name": "Rankweil Montfortstra\u00dfe",
-      "ids": [
-        "at:48:1453:0:1",
-        "at:48:1453:0:2"
-      ]
+      "id": "1",
+      "name": "Bregenz Bahnhof"
     },
     {
-      "id": "at:48:1446:0:1",
-      "name": "Rankweil Konkordiaplatz",
-      "ids": [
-        "at:48:1446:0:1",
-        "at:48:1446:0:2"
-      ]
+      "id": "2",
+      "name": "Bregenz Hafen"
     }
   ],
-  "destinations": [
-    {
-      "icon": "home",
-      "keywords": [
-        "Feldkirch Kloster"
-      ],
-      "name": "Zuhause",
-      "via_stops": [
-        {
-          "id": "at:48:544:0:1",
-          "name": "Altenstadt Kloster"
-        }
-      ]
-    },
-    {
-      "icon": "work",
-      "keywords": [
-        "Feldkirch Busplatz"
-      ],
-      "name": "Firma",
-      "via_stops": [
-        {
-          "id": "at:48:818:0:1",
-          "name": "Feldkirch Busplatz"
-        }
-      ]
-    },
-    {
-      "icon": "train",
-      "via_stops": [
-        {
-          "id": "at:48:1436:0:1",
-          "name": "Rankweil Bahnhof"
-        }
-      ]
-    }
-  ]
+  "destinations": []
 }

@@ -65,6 +65,54 @@ class VMobilAPI:
             logger.warning(f"VMobilWebScraper failed: {e}")
             self.scraper = None
             self.use_scraper = False
+        self._via_ids_cache = {}
+
+    def _resolve_via_ids(self, via: Dict, gtfs=None) -> List[str]:
+        """Liefert robuste ID-Liste für Via-Stop (ids[] bevorzugt, sonst via Name auflösen)."""
+        via_ids = via.get('ids') or [via.get('id')]
+        via_ids = [sid for sid in via_ids if sid]
+
+        if len(via_ids) > 1 or not gtfs:
+            return via_ids
+
+        via_name = via.get('name')
+        if not via_name:
+            return via_ids
+
+        cache_key = via_name.strip().lower()
+        cached = self._via_ids_cache.get(cache_key)
+        if cached is not None:
+            return cached
+
+        try:
+            matches = gtfs.search_stops(via_name, limit=10)
+            exact = next((m for m in matches if m.get('name') == via_name), None)
+            resolved = exact.get('ids', []) if exact else via_ids
+            resolved = [sid for sid in resolved if sid]
+            if not resolved:
+                resolved = via_ids
+            self._via_ids_cache[cache_key] = resolved
+            return resolved
+        except Exception as e:
+            logger.debug(f"Via-ID resolve failed for {via_name}: {e}")
+            self._via_ids_cache[cache_key] = via_ids
+            return via_ids
+
+    def _infer_trip_id_for_live(self, dep: 'Departure', gtfs) -> Optional[str]:
+        """Live-Abfahrt ohne trip_id per GTFS approximieren."""
+        if dep.trip_id or not dep.boarding_stop_id or not gtfs:
+            return dep.trip_id
+        try:
+            return gtfs.find_trip_id_for_departure(
+                stop_id=dep.boarding_stop_id,
+                line=str(dep.line),
+                departure_time=dep.departure_time,
+                destination=dep.destination,
+                max_diff_minutes=8,
+            )
+        except Exception as e:
+            logger.debug(f"Trip inference failed for {dep.line}/{dep.destination}: {e}")
+            return None
     
     def search_stops(self, query: str) -> List[Dict[str, str]]:
         """
@@ -228,6 +276,8 @@ class VMobilAPI:
         # Icons via Via-Halt-Matching (GTFS) oder Keyword-Fallback (Scraper)
         gtfs = self.gtfs if self.use_gtfs else None
         for dep in unique_deps:
+            if gtfs and not dep.trip_id:
+                dep.trip_id = self._infer_trip_id_for_live(dep, gtfs)
             dep.icons = self._match_destination_icons(dep, destinations, gtfs)
 
         return unique_deps[:limit]
@@ -259,7 +309,7 @@ class VMobilAPI:
                 for via in via_stops:
                     if matched_entry:
                         break
-                    via_ids = via.get('ids') or [via.get('id')]
+                    via_ids = self._resolve_via_ids(via, gtfs)
                     for via_id in via_ids:
                         if not via_id:
                             continue
