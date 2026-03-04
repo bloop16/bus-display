@@ -269,7 +269,7 @@ class GTFSLoader:
         self.stops_data = {s['stop_id']: s for s in fallback}
 
     def get_scheduled_departures(self, stop_id: str, limit: int = 10, now: datetime = None) -> list:
-        """Get upcoming scheduled departures from GTFS stop_times."""
+        """Get upcoming scheduled departures from GTFS stop_times (incl. next day rollover)."""
         if now is None:
             now = datetime.now()
 
@@ -286,7 +286,7 @@ class GTFSLoader:
             if dep_seconds is None:
                 continue
             if dep_seconds < now_seconds:
-                continue
+                dep_seconds += 24 * 3600
 
             trip = self.trips_data.get(entry.get('trip_id', ''), {})
             route = self.routes_data.get(trip.get('route_id', ''), {})

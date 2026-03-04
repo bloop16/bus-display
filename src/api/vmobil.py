@@ -113,6 +113,37 @@ class VMobilAPI:
         except Exception as e:
             logger.debug(f"Trip inference failed for {dep.line}/{dep.destination}: {e}")
             return None
+
+    def _resolve_configured_stop_ids(self, stop: Dict) -> List[str]:
+        """
+        Resolve stop IDs from config robustly.
+        Keeps configured IDs first and appends GTFS-resolved IDs by stop name
+        (useful for legacy numeric IDs from older configs).
+        """
+        configured = stop.get('ids') or [stop.get('id')]
+        configured = [sid for sid in configured if sid]
+
+        if not (self.use_gtfs and self.gtfs):
+            return configured
+
+        stop_name = (stop.get('name') or '').strip()
+        if not stop_name:
+            return configured
+
+        try:
+            matches = self.gtfs.search_stops(stop_name, limit=10)
+            exact = next((m for m in matches if (m.get('name') or '').strip() == stop_name), None)
+            resolved = (exact or {}).get('ids') or []
+            combined = list(configured)
+            for sid in resolved:
+                if sid and sid not in combined:
+                    combined.append(sid)
+            if combined != configured:
+                logger.info(f"Resolved additional stop IDs for '{stop_name}': {combined}")
+            return combined
+        except Exception as e:
+            logger.debug(f"Stop-ID resolution failed for '{stop_name}': {e}")
+            return configured
     
     def search_stops(self, query: str) -> List[Dict[str, str]]:
         """
@@ -249,9 +280,7 @@ class VMobilAPI:
         all_deps: List[Departure] = []
 
         for stop in stops:
-            # ids-Liste bevorzugen (gebundelte Steige), sonst Einzel-ID
-            stop_ids = stop.get('ids') or [stop.get('id')]
-            stop_ids = [sid for sid in stop_ids if sid]  # None filtern
+            stop_ids = self._resolve_configured_stop_ids(stop)
             for sid in stop_ids:
                 try:
                     deps = self.get_departures(stop_id=sid, limit=limit)
