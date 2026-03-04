@@ -82,22 +82,16 @@ class DisplayRenderer:
         y = 1
         now_str = datetime.now().strftime("%H:%M")
         now_w = int(draw.textlength(now_str, font=self.font_line))
-        draw.text((self.width - now_w - 2, y), now_str, font=self.font_line, fill=0)
+        draw.text(((self.width - now_w) // 2, y), now_str, font=self.font_line, fill=0)
 
-        title_text = "Bus Terminal"
-        title_max_px = self.width - now_w - 10
-        draw.text((2, y), self._truncate(title_text, max_px=title_max_px), font=self.font_header, fill=0)
-
-        status_parts = []
-        if battery_percent is not None:
-            status_parts.append(f"B:{battery_percent}%")
+        status_y = y + 11
         if wifi_signal is not None:
-            status_parts.append(f"W:{wifi_signal}")
-
-        if status_parts:
-            status_text = " ".join(status_parts)
-            status_w = int(draw.textlength(status_text, font=self.font_small))
-            draw.text((self.width - status_w - 2, y + 11), status_text, font=self.font_small, fill=0)
+            wifi_text = f"W:{wifi_signal}"
+            draw.text((2, status_y), wifi_text, font=self.font_small, fill=0)
+        if battery_percent is not None:
+            bat_text = f"B:{battery_percent}%"
+            bat_w = int(draw.textlength(bat_text, font=self.font_small))
+            draw.text((self.width - bat_w - 2, status_y), bat_text, font=self.font_small, fill=0)
 
         # ── Divider ───────────────────────────────────────────────
         y += 22
