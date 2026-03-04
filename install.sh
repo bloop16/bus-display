@@ -2,6 +2,7 @@
 # Bus Display – Installation für Raspberry Pi Zero
 # Waveshare 2.13" e-Paper HAT V4 + PiSugar 3
 # Ausführen als root: sudo ./install.sh
+# Idempotent: kann mehrfach ausgeführt werden ohne Probleme
 
 set -e
 echo "=== Bus Display Installation ==="
@@ -28,30 +29,45 @@ apt-get install -y \
     python3-flask \
     git curl netcat-openbsd
 
-# ── SPI aktivieren (Waveshare Display) ───────────────────────
-echo "SPI aktivieren..."
-raspi-config nonint do_spi 0
+# ── SPI aktivieren (Waveshare Display) ────────────────────────
+if ! grep -q "^dtparam=spi=on" /boot/config.txt 2>/dev/null && \
+   ! grep -q "^dtparam=spi=on" /boot/firmware/config.txt 2>/dev/null; then
+    echo "SPI aktivieren..."
+    raspi-config nonint do_spi 0
+else
+    echo "SPI bereits aktiv"
+fi
 
 # ── I2C aktivieren (PiSugar 3) ────────────────────────────────
-echo "I2C aktivieren..."
-raspi-config nonint do_i2c 0
+if ! grep -q "^dtparam=i2c_arm=on" /boot/config.txt 2>/dev/null && \
+   ! grep -q "^dtparam=i2c_arm=on" /boot/firmware/config.txt 2>/dev/null; then
+    echo "I2C aktivieren..."
+    raspi-config nonint do_i2c 0
+else
+    echo "I2C bereits aktiv"
+fi
 
-# ── Waveshare e-Paper Bibliothek (nur Python-Lib, kein voller Clone) ──
-echo "Waveshare Bibliothek installieren (sparse checkout)..."
-rm -rf /tmp/waveshare-epd
-git clone \
-    --depth=1 \
-    --filter=blob:none \
-    --sparse \
-    https://github.com/waveshare/e-Paper.git \
-    /tmp/waveshare-epd
-cd /tmp/waveshare-epd
-git sparse-checkout set RaspberryPi_JetsonNano/python
-pip3 install ./RaspberryPi_JetsonNano/python/ \
-    --break-system-packages 2>/dev/null || \
-    pip3 install ./RaspberryPi_JetsonNano/python/
-cd /
-rm -rf /tmp/waveshare-epd
+# ── Waveshare e-Paper Bibliothek ──────────────────────────────
+if python3 -c "from waveshare_epd import epd2in13_V4" 2>/dev/null; then
+    echo "Waveshare bereits installiert"
+else
+    echo "Waveshare Bibliothek installieren (sparse checkout)..."
+    rm -rf /tmp/waveshare-epd
+    git clone \
+        --depth=1 \
+        --filter=blob:none \
+        --sparse \
+        https://github.com/waveshare/e-Paper.git \
+        /tmp/waveshare-epd
+    cd /tmp/waveshare-epd
+    git sparse-checkout set RaspberryPi_JetsonNano/python
+    pip3 install ./RaspberryPi_JetsonNano/python/ \
+        --break-system-packages 2>/dev/null || \
+        pip3 install ./RaspberryPi_JetsonNano/python/
+    cd /
+    rm -rf /tmp/waveshare-epd
+    echo "✓ Waveshare installiert"
+fi
 
 # ── pip Dependencies ──────────────────────────────────────────
 cd "$INSTALL_DIR"
@@ -60,21 +76,22 @@ pip3 install -r requirements.txt \
     pip3 install -r requirements.txt
 
 # ── PiSugar 3 Daemon ──────────────────────────────────────────
-echo "PiSugar 3 installieren..."
-curl -s https://cdn.pisugar.com/release/pisugar-power-manager.sh | bash
+if systemctl is-enabled pisugar-server &>/dev/null; then
+    echo "PiSugar bereits installiert"
+    systemctl start pisugar-server 2>/dev/null || true
+else
+    echo "PiSugar 3 installieren..."
+    curl -s https://cdn.pisugar.com/release/pisugar-power-manager.sh | bash
+    systemctl enable pisugar-server 2>/dev/null || true
+    systemctl start  pisugar-server 2>/dev/null || true
+fi
 
-# PiSugar installiert den Service als 'pisugar-server'
-echo "PiSugar Service aktivieren..."
-systemctl enable pisugar-server 2>/dev/null || true
-systemctl start  pisugar-server 2>/dev/null || true
-
-# Kurz warten und Status prüfen
+# Kurz warten und PiSugar-Status prüfen
 sleep 3
 if systemctl is-active --quiet pisugar-server; then
     echo "✓ pisugar-server läuft"
-    # Verbindung zum Socket testen
     if echo "get battery" | nc -U /tmp/pisugar-server.sock 2>/dev/null | grep -q "battery:"; then
-        echo "✓ PiSugar Socket antwortet (Akku erkannt)"
+        echo "✓ PiSugar Socket antwortet"
     else
         echo "⚠ PiSugar Socket nicht erreichbar (Hardware angeschlossen?)"
     fi
@@ -90,12 +107,13 @@ sed -i "s|/home/pi/bus-display|$INSTALL_DIR|g" /etc/systemd/system/bus-display.s
 sed -i "s|User=pi|User=$ACTUAL_USER|g"          /etc/systemd/system/bus-display.service
 
 # Alten Web-Service entfernen falls vorhanden
+systemctl stop    bus-display-web 2>/dev/null || true
 systemctl disable bus-display-web 2>/dev/null || true
 rm -f /etc/systemd/system/bus-display-web.service
 
 systemctl daemon-reload
 systemctl enable bus-display
-systemctl start  bus-display
+systemctl restart bus-display
 
 # ── Status-Übersicht ──────────────────────────────────────────
 sleep 2
