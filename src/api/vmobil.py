@@ -23,12 +23,20 @@ class Departure:
     departure_time: datetime
     stop_name: str
     delay_minutes: Optional[int] = None
-    icon: Optional[str] = None  # 'home', 'work', 'star' oder None
+    icons: List[str] = None             # ['home', 'train', ...] – alle passenden Icons
+    trip_id: Optional[str] = None       # GTFS trip_id für Via-Halt-Matching (intern)
+    boarding_stop_id: Optional[str] = None  # Stop-ID des Einstiegs (intern)
+
+    def __post_init__(self):
+        if self.icons is None:
+            self.icons = []
 
     def to_dict(self) -> Dict:
         """Convert to dictionary for JSON serialization"""
         data = asdict(self)
         data['departure_time'] = self.departure_time.isoformat()
+        data.pop('trip_id', None)           # interne Felder nicht an Web-UI senden
+        data.pop('boarding_stop_id', None)
         return data
 
 
@@ -169,7 +177,8 @@ class VMobilAPI:
                             destination=dep['destination'],
                             departure_time=dep['departure_time'],
                             stop_name=dep['stop_name'],
-                            delay_minutes=dep.get('delay_minutes')
+                            delay_minutes=dep.get('delay_minutes'),
+                            trip_id=dep.get('trip_id'),
                         )
                         for dep in scheduled
                     ]
@@ -187,38 +196,94 @@ class VMobilAPI:
     ) -> List[Departure]:
         """
         Aggregate departures from all configured stops, sorted by time.
-
-        Args:
-            stops: List of stop dicts with 'id' and 'name'
-            destinations: List of destination dicts with 'icon' and 'keywords'
-            limit: Maximum total departures to return
-
-        Returns:
-            Merged, time-sorted list of Departure objects (with icon set if matching)
+        Jeder Stop kann mehrere IDs haben (stops[n]['ids'] oder ['id'] als Fallback).
         """
         all_deps: List[Departure] = []
 
         for stop in stops:
-            try:
-                deps = self.get_departures(stop_id=stop['id'], limit=limit)
-                all_deps.extend(deps)
-            except Exception as e:
-                logger.warning(f"Failed to get departures for {stop.get('name')}: {e}")
+            # ids-Liste bevorzugen (gebundelte Steige), sonst Einzel-ID
+            stop_ids = stop.get('ids') or [stop.get('id')]
+            stop_ids = [sid for sid in stop_ids if sid]  # None filtern
+            for sid in stop_ids:
+                try:
+                    deps = self.get_departures(stop_id=sid, limit=limit)
+                    for dep in deps:
+                        dep.boarding_stop_id = sid  # Einstiegs-Stop merken für Richtungsprüfung
+                    all_deps.extend(deps)
+                except Exception as e:
+                    logger.warning(f"Failed to get departures for {stop.get('name')} / {sid}: {e}")
 
         # Sort by departure time
         all_deps.sort(key=lambda d: d.departure_time)
 
-        # Assign icons via keyword matching
+        # Duplikate entfernen: gleiche Linie + Abfahrtszeit + Ziel = selbe Fahrt
+        seen: set = set()
+        unique_deps: List[Departure] = []
         for dep in all_deps:
-            dep.icon = self._match_destination_icon(dep.destination, destinations)
+            key = (dep.line, dep.departure_time, dep.destination)
+            if key not in seen:
+                seen.add(key)
+                unique_deps.append(dep)
 
-        return all_deps[:limit]
+        # Icons via Via-Halt-Matching (GTFS) oder Keyword-Fallback (Scraper)
+        gtfs = self.gtfs if self.use_gtfs else None
+        for dep in unique_deps:
+            dep.icons = self._match_destination_icons(dep, destinations, gtfs)
 
-    def _match_destination_icon(self, destination: str, destinations: List[Dict]) -> Optional[str]:
-        """Return icon name if destination matches any configured keyword, else None."""
-        dest_lower = destination.lower()
+        return unique_deps[:limit]
+
+    def _match_destination_icons(
+        self,
+        dep: 'Departure',
+        destinations: List[Dict],
+        gtfs=None,
+    ) -> List[str]:
+        """
+        Sammelt ALLE passenden Icons für eine Abfahrt (nicht nur das erste).
+        - Primär: via_stops (GTFS) – Trip hält an konfigurierter Zwischen-Haltestelle
+        - Fallback: keywords auf Destination-Text (Scraper / kein trip_id)
+        """
+        matched: List[str] = []
+        seen_icons: set = set()
+
         for entry in destinations:
-            for keyword in entry.get('keywords', []):
-                if keyword.lower() in dest_lower:
-                    return entry.get('icon')
-        return None
+            icon = entry.get('icon')
+            if not icon or icon in seen_icons:
+                continue
+
+            matched_entry = False
+
+            # Via-Halt-Matching (GTFS) – nur wenn Via-Stop NACH dem Einstieg kommt
+            via_stops = entry.get('via_stops', [])
+            if via_stops and dep.trip_id and gtfs:
+                for via in via_stops:
+                    if matched_entry:
+                        break
+                    via_ids = via.get('ids') or [via.get('id')]
+                    for via_id in via_ids:
+                        if not via_id:
+                            continue
+                        if dep.boarding_stop_id:
+                            if gtfs.trip_passes_stop_after(dep.trip_id, dep.boarding_stop_id, via_id):
+                                matched_entry = True
+                                break
+                        else:
+                            if gtfs.trip_passes_stop(dep.trip_id, via_id):
+                                matched_entry = True
+                                break
+
+            # Keyword-Fallback (rückwärtskompatibel / Scraper-Daten)
+            if not matched_entry:
+                keywords = entry.get('keywords', [])
+                if keywords:
+                    dest_lower = dep.destination.lower()
+                    for kw in keywords:
+                        if kw.lower() in dest_lower:
+                            matched_entry = True
+                            break
+
+            if matched_entry:
+                matched.append(icon)
+                seen_icons.add(icon)
+
+        return matched

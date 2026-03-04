@@ -11,16 +11,16 @@ from src.power.pisugar import PiSugar
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-MAX_SLEEP_SEC        = 20 * 60   # Fallback: 20 Minuten wenn keine Abfahrten
-DEPARTURE_BUFFER_SEC = 45        # Puffer nach Abfahrt bevor neu geladen wird
-NO_CONFIG_SLEEP_SEC  = 30        # Retry wenn noch keine Stops konfiguriert
+MAX_SLEEP_SEC        = 20 * 60   # Fallback wenn keine Abfahrten mehr heute
+DEPARTURE_BUFFER_SEC = 30        # Sekunden VOR Abfahrt refreshen (frische Daten)
+NO_CONFIG_SLEEP_SEC  = 5         # Schneller Retry bis Stops konfiguriert sind
 
 
-def _start_web_server(api: VMobilAPI):
+def _start_web_server(api: VMobilAPI, on_config_saved=None):
     """Flask Web-UI in Hintergrund-Thread. Nutzt geteilte VMobilAPI-Instanz."""
     try:
         from src.web.app import create_app
-        app = create_app(api=api)
+        app = create_app(api=api, on_config_saved=on_config_saved)
         log = logging.getLogger('werkzeug')
         log.setLevel(logging.WARNING)
         app.run(host='0.0.0.0', port=5000, debug=False, use_reloader=False)
@@ -37,9 +37,19 @@ class BusDisplay:
         self.display = DisplayDriver(mock=mock_display)
         self.pisugar = PiSugar(mock=mock_battery)
         self.button_pressed = False
-        self.pisugar.register_button_callback(
-            lambda: setattr(self, 'button_pressed', True) or self.update_display()
-        )
+        self.wakeup_event = threading.Event()
+        self.pisugar.register_button_callback(self._on_button)
+
+    def _on_button(self):
+        """Button-Callback: weckt den Schlaf-Loop sofort auf."""
+        logger.info("Button gedrückt – sofortiges Update")
+        self.button_pressed = True
+        self.wakeup_event.set()
+
+    def notify_config_changed(self):
+        """Wird von der Web-UI aufgerufen wenn Konfiguration gespeichert wurde."""
+        logger.info("Konfiguration geändert – sofortiges Display-Update")
+        self.wakeup_event.set()
 
     def _get_wifi_signal(self) -> Optional[int]:
         """WiFi-Signalstärke aus /proc/net/wireless (0-100 oder None)."""
@@ -88,42 +98,64 @@ class BusDisplay:
             logger.error(f"Update failed: {e}")
             return []
 
-    def _sleep_until_next_departure(self, departures: list) -> None:
-        """Schläft bis kurz nach der nächsten Abfahrt."""
+    def _seconds_until_next_update(self, departures: list) -> int:
+        """Liefert Sekunden bis kurz VOR der nächsten Abfahrt (für frische Daten)."""
         now = datetime.now()
         future = [d for d in departures if d.departure_time > now]
 
         if not future:
-            logger.info(f"Keine anstehenden Abfahrten, warte {MAX_SLEEP_SEC // 60} min")
-            time.sleep(MAX_SLEEP_SEC)
-            return
+            logger.info(f"Keine anstehenden Abfahrten – nächstes Update in {MAX_SLEEP_SEC // 60} min")
+            return MAX_SLEEP_SEC
 
         next_dep = future[0]
         seconds_until = (next_dep.departure_time - now).total_seconds()
-        sleep_sec = max(30, min(seconds_until + DEPARTURE_BUFFER_SEC, MAX_SLEEP_SEC))
+        # DEPARTURE_BUFFER_SEC vor Abfahrt aufwachen → Display zeigt aktuelle Daten
+        sleep_sec = max(10, int(seconds_until - DEPARTURE_BUFFER_SEC))
+        sleep_sec = min(sleep_sec, MAX_SLEEP_SEC)
 
         wake_at = next_dep.departure_time.strftime('%H:%M')
-        logger.info(f"Nächste Abfahrt: Linie {next_dep.line} um {wake_at} → Update in {sleep_sec:.0f}s")
-        time.sleep(sleep_sec)
+        logger.info(f"Nächste Abfahrt: Linie {next_dep.line} um {wake_at} → Refresh in {sleep_sec}s")
+        return sleep_sec
 
     def run_once(self):
         self.update_display()
 
     def run_continuous(self):
-        mode = "auto" if self.pisugar.is_charging() else "button"
-        logger.info(f"Mode: {mode}")
+        """
+        Haupt-Loop:
+        - Netzstrom (AC): automatisches Update kurz vor jeder Abfahrt
+        - Batterie:       nur auf Button-Druck aktualisieren
+        - Beide Modi:     sofortiges Update beim Start und nach Config-Änderung
+        """
+        last_on_battery = None
+
         while True:
             try:
-                if mode == "auto":
-                    deps = self.update_display()
-                    if deps is None:
-                        # Noch nicht konfiguriert → kurz warten, dann nochmal
-                        time.sleep(NO_CONFIG_SLEEP_SEC)
-                    else:
-                        self._sleep_until_next_departure(deps)
-                elif mode == "button":
-                    if not self.button_pressed:
-                        time.sleep(1)
+                on_battery = not self.pisugar.is_charging()
+
+                if on_battery != last_on_battery:
+                    mode_str = "Batterie (nur Button)" if on_battery else "Netzbetrieb (auto)"
+                    logger.info(f"Betriebsmodus: {mode_str}")
+                    last_on_battery = on_battery
+
+                # Sofortiges Update – beim Start, nach Button, nach Config-Änderung
+                deps = self.update_display()
+
+                if deps is None:
+                    # Noch nicht konfiguriert → häufiger retry
+                    self.wakeup_event.wait(timeout=NO_CONFIG_SLEEP_SEC)
+                    self.wakeup_event.clear()
+                elif on_battery:
+                    # Batterie: unbegrenzt warten bis Button oder Config-Änderung
+                    logger.info("Warte auf Button-Druck…")
+                    self.wakeup_event.wait()
+                    self.wakeup_event.clear()
+                else:
+                    # Netzstrom: automatisch vor nächster Abfahrt aufwachen
+                    timeout = self._seconds_until_next_update(deps)
+                    self.wakeup_event.wait(timeout=timeout)
+                    self.wakeup_event.clear()
+
             except KeyboardInterrupt:
                 break
             except Exception as e:
@@ -145,7 +177,7 @@ if __name__ == '__main__':
     # Web-UI als Daemon-Thread mit geteilter api-Instanz → kein zweiter GTFS-Download
     if not args.no_web:
         web_thread = threading.Thread(
-            target=_start_web_server, args=(d.api,), daemon=True, name='web-ui'
+            target=_start_web_server, args=(d.api, d.notify_config_changed), daemon=True, name='web-ui'
         )
         web_thread.start()
         logger.info("Web-UI gestartet auf http://0.0.0.0:5000")

@@ -10,8 +10,9 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-def create_app(testing=False, api=None):
-    """Application factory. api: geteilte VMobilAPI-Instanz aus main.py (vermeidet Doppel-Init)."""
+def create_app(testing=False, api=None, on_config_saved=None):
+    """Application factory. api: geteilte VMobilAPI-Instanz aus main.py (vermeidet Doppel-Init).
+    on_config_saved: optionaler Callback – wird nach jedem Config-Save aufgerufen (Display-Update)."""
     app = Flask(__name__)
     app.config['TESTING'] = testing
 
@@ -94,6 +95,12 @@ def create_app(testing=False, api=None):
             _save_config(config)
             logger.info(f'Config saved: {len(config["stops"])} stops, '
                         f'{len(config.get("destinations", []))} destinations')
+            # Display sofort aktualisieren (falls BusDisplay-Instanz verfügbar)
+            if on_config_saved:
+                try:
+                    on_config_saved()
+                except Exception as cb_err:
+                    logger.warning(f'Config-Callback fehlgeschlagen: {cb_err}')
             return jsonify({'status': 'ok'})
         except Exception as e:
             logger.error(f'Config save failed: {e}')

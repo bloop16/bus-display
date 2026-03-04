@@ -12,6 +12,7 @@ import requests
 from datetime import datetime, timedelta
 from pathlib import Path
 from collections import defaultdict
+from typing import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -33,6 +34,8 @@ class GTFSLoader:
         self.routes_data = {}
         self.trips_data = {}
         self.stop_times_index = defaultdict(list)
+        # stop_id → set of trip_ids that serve this stop (für Via-Halt-Matching)
+        self.stop_trip_sets: dict = {}
         self.cache_file = STOPS_CACHE_FILE
         self.schedule_cache_file = SCHEDULE_CACHE_FILE
         self._ensure_cache_dir()
@@ -83,6 +86,20 @@ class GTFSLoader:
                 self.stop_times_index = defaultdict(list)
                 for stop_id, entries in data.get('stop_times_index', {}).items():
                     self.stop_times_index[stop_id].extend(entries)
+                raw_sets = data.get('stop_trip_sets', {})
+                if not raw_sets:
+                    logger.info("Schedule-Cache veraltet (kein stop_trip_sets) – wird neu geladen")
+                    self._fetch_and_parse()
+                    return
+                self.stop_trip_sets = {sid: set(tids) for sid, tids in raw_sets.items()}
+                # Cache-Version prüfen: stop_sequence muss in stop_times_index enthalten sein
+                sample = next(
+                    (e for entries in self.stop_times_index.values() for e in entries), None
+                )
+                if sample and 'stop_sequence' not in sample:
+                    logger.info("Schedule-Cache veraltet (kein stop_sequence) – wird neu geladen")
+                    self._fetch_and_parse()
+                    return
                 logger.info(
                     f"Loaded schedule cache: {len(self.routes_data)} routes, "
                     f"{len(self.trips_data)} trips, {len(self.stop_times_index)} stops"
@@ -182,6 +199,7 @@ class GTFSLoader:
                 }
 
             self.stop_times_index = defaultdict(list)
+            self.stop_trip_sets = {}
             with zip_file.open(stop_times_files[0]) as f:
                 reader = csv.DictReader(f.read().decode('utf-8-sig').splitlines())
                 for row in reader:
@@ -190,10 +208,16 @@ class GTFSLoader:
                     dep_time = row.get('departure_time', '')
                     if not stop_id or not trip_id or not dep_time:
                         continue
+                    seq = row.get('stop_sequence', '0')
                     self.stop_times_index[stop_id].append({
                         'trip_id': trip_id,
                         'departure_time': dep_time,
+                        'stop_sequence': int(seq) if str(seq).isdigit() else 0,
                     })
+                    # Via-Halt-Index: welche Trips halten an diesem Stop?
+                    if stop_id not in self.stop_trip_sets:
+                        self.stop_trip_sets[stop_id] = set()
+                    self.stop_trip_sets[stop_id].add(trip_id)
 
             self._save_schedule_cache()
             logger.info(
@@ -211,6 +235,7 @@ class GTFSLoader:
                 'routes': self.routes_data,
                 'trips': self.trips_data,
                 'stop_times_index': dict(self.stop_times_index),
+                'stop_trip_sets': {sid: list(tids) for sid, tids in self.stop_trip_sets.items()},
             }
             with open(self.schedule_cache_file, 'w', encoding='utf-8') as f:
                 json.dump(data, f, ensure_ascii=False)
@@ -276,6 +301,7 @@ class GTFSLoader:
                 'departure_time': dep_dt,
                 'stop_name': self.get_stop(stop_id).get('stop_name', stop_id),
                 'delay_minutes': None,
+                'trip_id': entry.get('trip_id'),
             })
 
         upcoming.sort(key=lambda x: x['departure_time'])
@@ -293,35 +319,76 @@ class GTFSLoader:
             return None
 
     def search_stops(self, query: str, limit: int = 10) -> list:
-        """Search for stops by name or partial match"""
+        """
+        Suche Haltestellen nach Name.
+        Stops mit identischem Namen (= verschiedene Steige/Richtungen)
+        werden zu einem einzigen Eintrag zusammengefasst.
+        Das zurückgegebene 'id' ist die kanonische ID (erste gefundene),
+        'ids' enthält alle zugehörigen Stop-IDs.
+        """
         if not query:
             return []
 
         query_lower = query.lower()
-        matches = []
+        # name → {ids, lat, lon}
+        grouped: dict = {}
 
         for stop_id, stop in self.stops_data.items():
-            name = stop.get('stop_name', '').lower()
-            if query_lower in name:
-                matches.append({
-                    'id': stop_id,
-                    'name': stop.get('stop_name', ''),
-                    'lat': stop.get('stop_lat', 0),
-                    'lon': stop.get('stop_lon', 0),
-                })
-
-        # Sort by relevance (exact match, then prefix, then contains)
-        def relevance_score(item):
-            name = item['name'].lower()
-            if name == query_lower:
-                return 0
-            elif name.startswith(query_lower):
-                return 1
+            name = stop.get('stop_name', '')
+            if query_lower not in name.lower():
+                continue
+            if name not in grouped:
+                grouped[name] = {
+                    'name': name,
+                    'ids':  [stop_id],
+                    'lat':  stop.get('stop_lat', 0),
+                    'lon':  stop.get('stop_lon', 0),
+                }
             else:
-                return 2
+                grouped[name]['ids'].append(stop_id)
 
-        matches.sort(key=relevance_score)
-        return matches[:limit]
+        matches = list(grouped.values())
+
+        # Sortierung: Exakter Treffer > Präfix > Enthält
+        def relevance(item):
+            n = item['name'].lower()
+            if n == query_lower:      return 0
+            if n.startswith(query_lower): return 1
+            return 2
+
+        matches.sort(key=relevance)
+        result = matches[:limit]
+
+        # 'id' = erste ID (rückwärtskompatibel)
+        for m in result:
+            m['id'] = m['ids'][0]
+
+        return result
+
+    def trip_passes_stop(self, trip_id: str, stop_id: str) -> bool:
+        """True wenn der Trip an der gegebenen stop_id hält (ohne Richtungsprüfung)."""
+        trip_set = self.stop_trip_sets.get(stop_id)
+        if trip_set is None:
+            return False
+        return trip_id in trip_set
+
+    def _get_trip_stop_sequence(self, trip_id: str, stop_id: str) -> Optional[int]:
+        """Gibt die stop_sequence von stop_id im gegebenen Trip zurück, oder None."""
+        for entry in self.stop_times_index.get(stop_id, []):
+            if entry.get('trip_id') == trip_id:
+                return entry.get('stop_sequence')
+        return None
+
+    def trip_passes_stop_after(self, trip_id: str, boarding_stop_id: str, via_stop_id: str) -> bool:
+        """
+        True wenn der Trip via_stop_id anfährt UND zwar NACH boarding_stop_id
+        (in Fahrtrichtung, d.h. via_sequence > boarding_sequence).
+        """
+        boarding_seq = self._get_trip_stop_sequence(trip_id, boarding_stop_id)
+        via_seq = self._get_trip_stop_sequence(trip_id, via_stop_id)
+        if boarding_seq is None or via_seq is None:
+            return False
+        return via_seq > boarding_seq
 
     def get_stop(self, stop_id: str) -> dict:
         """Get stop details by ID"""
