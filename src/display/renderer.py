@@ -77,8 +77,7 @@ class DisplayRenderer:
 
         # ── Header ───────────────────────────────────────────────
         y = 1
-        header_text = self._truncate(stop_name, max_px=155)
-        draw.text((2, y), header_text, font=self.font_header, fill=0)
+        draw.text((2, y), "Bus Terminal", font=self.font_header, fill=0)
 
         # Status indicators (right side, stacked left from edge)
         x_right = self.width - 2
@@ -111,19 +110,21 @@ class DisplayRenderer:
                 x = 2
                 row_y_center = y + (ROW_H - ICON_SIZE) // 2  # vertical center for icon
 
-                # Icons (12×12 each) – alle passenden Icons nebeneinander
+                # Line number (bold) – max 15 Zeichen
+                line_text = str(dep.line)[:15]
+                line_w = int(draw.textlength(line_text, font=self.font_line))
+                draw.text((x, y + 1), line_text, font=self.font_line, fill=0)
+                x += line_w + 3
+
+                # Icons (12×12 each) – nach Linienname, alle passenden Icons nebeneinander
                 icon_list = dep.icons if hasattr(dep, 'icons') and dep.icons else ()
                 for icon_name in icon_list:
                     icon_img = self._get_icon(icon_name)
                     if icon_img:
                         image.paste(icon_img, (x, row_y_center))
                         x += ICON_SIZE + 1
-
-                # Line number (bold)
-                line_text = str(dep.line)
-                line_w = int(draw.textlength(line_text, font=self.font_line))
-                draw.text((x, y + 1), line_text, font=self.font_line, fill=0)
-                x += line_w + 4
+                if icon_list:
+                    x += 2
 
                 # Time (right-aligned, immer absolute Uhrzeit HH:MM)
                 time_text = self._format_time(dep.departure_time)
@@ -135,9 +136,9 @@ class DisplayRenderer:
                 if show_stop_col and dep.stop_name:
                     abbr = self._abbrev_stop(dep.stop_name)
                     abbr_w = int(draw.textlength(abbr, font=self.font_small))
-                    draw.text((self.width - time_w - abbr_w - 6, y + 3), abbr,
+                    draw.text((self.width - time_w - abbr_w - 12, y + 3), abbr,
                               font=self.font_small, fill=0)
-                    stop_reserve = abbr_w + 6
+                    stop_reserve = abbr_w + 12
 
                 # Destination (zwischen Line und Stop/Time)
                 dest_max_px = self.width - x - time_w - stop_reserve - 8
